@@ -68,3 +68,23 @@ export function runInInjectionContext<T>(
 export function getCurrentInjectionContext(): Injector | null {
   return contextStack.getCurrentContext();
 }
+
+/**
+ * 断言当前处于注入上下文中，如果不在则抛出错误
+ * 主要用于 inject() 等函数中验证调用环境
+ * 
+ * @param errorMessage 可选的自定义错误消息
+ * @returns 当前活跃的注入器
+ * @throws Error 当没有活跃的注入上下文时
+ */
+export function assertInInjectionContext(
+  errorMessage: string = 'inject() 必须在注入上下文中调用'
+): Injector {
+  const currentInjector = getCurrentInjectionContext();
+  
+  if (currentInjector === null) {
+    throw new Error(errorMessage);
+  }
+  
+  return currentInjector;
+}

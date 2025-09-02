@@ -1,5 +1,6 @@
 import "reflect-metadata";
 export { InjectionToken, InjectionTokenOptions } from './injection-token';
+export { HostAttributeToken, isHostAttributeToken, createHostAttributeToken } from './host-attribute-token';
 export { 
   Injector, 
   InjectionTokenType, 
@@ -34,9 +35,18 @@ export {
   getInjectOptionsMetadata,
   hasInjectMetadata 
 } from './inject';
+export { Optional, Self, SkipSelf, Host } from './parameter-decorators';
 export { InjectOptions } from './inject-options';
+export { 
+  InternalInjectFlags, 
+  combineInjectFlags, 
+  hasFlag, 
+  convertInjectOptionsToFlags,
+  convertFlagsToInjectOptions,
+  flagsToString 
+} from './internal-inject-flags';
 export { OnDestroy, isOnDestroy } from './lifecycle';
-export { runInInjectionContext, getCurrentInjectionContext } from './injection-context';
+export { runInInjectionContext, getCurrentInjectionContext, assertInInjectionContext } from './injection-context';
 export { forwardRef, ForwardRef, isForwardRef, resolveForwardRef } from './forward-ref';
 
 // 调试和开发工具

@@ -266,3 +266,85 @@ describe('🔄 重构阶段：集成测试', () => {
     injector.destroy();
   });
 });
+
+describe('PRD_v2.md 新功能导出测试', () => {
+  describe('参数装饰器导出', () => {
+    it('应该导出新增的参数装饰器', () => {
+      expect(DI.Optional).toBeDefined();
+      expect(DI.Self).toBeDefined();
+      expect(DI.SkipSelf).toBeDefined();
+      expect(DI.Host).toBeDefined();
+      
+      expect(typeof DI.Optional).toBe('function');
+      expect(typeof DI.Self).toBe('function');
+      expect(typeof DI.SkipSelf).toBe('function');
+      expect(typeof DI.Host).toBe('function');
+    });
+  });
+
+  describe('HostAttributeToken 导出', () => {
+    it('应该导出 HostAttributeToken 相关功能', () => {
+      expect(DI.HostAttributeToken).toBeDefined();
+      expect(DI.isHostAttributeToken).toBeDefined();
+      expect(DI.createHostAttributeToken).toBeDefined();
+      
+      expect(typeof DI.HostAttributeToken).toBe('function');
+      expect(typeof DI.isHostAttributeToken).toBe('function');
+      expect(typeof DI.createHostAttributeToken).toBe('function');
+      
+      const token = new DI.HostAttributeToken<string>('data-test');
+      expect(DI.isHostAttributeToken(token)).toBe(true);
+    });
+  });
+
+  describe('InternalInjectFlags 导出', () => {
+    it('应该导出位标志优化系统', () => {
+      expect(DI.InternalInjectFlags).toBeDefined();
+      expect(DI.combineInjectFlags).toBeDefined();
+      expect(DI.hasFlag).toBeDefined();
+      expect(DI.convertInjectOptionsToFlags).toBeDefined();
+      expect(DI.convertFlagsToInjectOptions).toBeDefined();
+      expect(DI.flagsToString).toBeDefined();
+      
+      expect(typeof DI.combineInjectFlags).toBe('function');
+      expect(typeof DI.hasFlag).toBe('function');
+      expect(typeof DI.convertInjectOptionsToFlags).toBe('function');
+      expect(typeof DI.convertFlagsToInjectOptions).toBe('function');
+      expect(typeof DI.flagsToString).toBe('function');
+    });
+    
+    it('应该能够使用位标志系统', () => {
+      const flags = DI.combineInjectFlags(
+        DI.InternalInjectFlags.Optional,
+        DI.InternalInjectFlags.SkipSelf
+      );
+      
+      expect(DI.hasFlag(flags, DI.InternalInjectFlags.Optional)).toBe(true);
+      expect(DI.hasFlag(flags, DI.InternalInjectFlags.SkipSelf)).toBe(true);
+      expect(DI.hasFlag(flags, DI.InternalInjectFlags.Self)).toBe(false);
+      
+      const flagsStr = DI.flagsToString(flags);
+      expect(flagsStr).toContain('Optional');
+      expect(flagsStr).toContain('SkipSelf');
+    });
+  });
+
+  describe('assertInInjectionContext 导出', () => {
+    it('应该导出 assertInInjectionContext 函数', () => {
+      expect(DI.assertInInjectionContext).toBeDefined();
+      expect(typeof DI.assertInInjectionContext).toBe('function');
+    });
+    
+    it('应该在注入上下文中工作', () => {
+      const injector = new DI.EnvironmentInjector([]);
+      
+      DI.runInInjectionContext(injector, () => {
+        expect(() => DI.assertInInjectionContext()).not.toThrow();
+        const currentInjector = DI.assertInInjectionContext();
+        expect(currentInjector).toBe(injector);
+      });
+      
+      injector.destroy();
+    });
+  });
+});
