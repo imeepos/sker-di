@@ -1,4 +1,3 @@
-import 'reflect-metadata';
 import { InjectionTokenType } from './injector';
 import { InjectOptions } from './inject-options';
 

@@ -1,5 +1,3 @@
-import 'reflect-metadata';
-
 /**
  * Injectable 配置选项
  */

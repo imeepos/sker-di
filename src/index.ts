@@ -1,3 +1,4 @@
+import "reflect-metadata";
 export { InjectionToken, InjectionTokenOptions } from './injection-token';
 export { 
   Injector, 
