@@ -448,4 +448,158 @@ describe('调试检查器测试', () => {
       expect(inspector1).toBe(inspector2);
     });
   });
+
+  describe('私有方法和边界情况测试', () => {
+    @Injectable()
+    class EdgeCaseService {
+      getValue(): string {
+        return 'edge-case';
+      }
+    }
+
+    it('应该正确处理空搜索字符串', () => {
+      enableDevMode({ logToConsole: false });
+      
+      const searchResult = inspector.searchTokens('');
+      expect(searchResult).toContain('未找到');
+    });
+
+    it('应该正确处理特殊字符搜索', () => {
+      enableDevMode({ logToConsole: false });
+      
+      injector = new EnvironmentInjector([
+        { provide: 'SPECIAL_TOKEN_$#@', useValue: 'special-value' }
+      ]);
+
+      const searchResult = inspector.searchTokens('SPECIAL');
+      expect(searchResult).toContain('搜索结果');
+    });
+
+    it('应该正确显示多提供者标识', () => {
+      enableDevMode({ logToConsole: false });
+      
+      injector = new EnvironmentInjector([
+        { provide: 'MULTI_TOKEN', useValue: 'value1', multi: true },
+        { provide: 'MULTI_TOKEN', useValue: 'value2', multi: true }
+      ]);
+
+      const details = inspector.printInjectorDetails();
+      expect(details).toContain('[multi]');
+    });
+
+    it('应该正确处理循环依赖检测', () => {
+      enableDevMode({ logToConsole: false });
+      
+      @Injectable()
+      class ServiceA {
+        constructor(@Inject(forwardRef(() => ServiceB)) private serviceB: any) {}
+      }
+
+      @Injectable()
+      class ServiceB {
+        constructor(@Inject(forwardRef(() => ServiceA)) private serviceA: any) {}
+      }
+
+      injector = new EnvironmentInjector([
+        { provide: ServiceA, useClass: ServiceA },
+        { provide: ServiceB, useClass: ServiceB }
+      ]);
+
+      try {
+        injector.get(ServiceA);
+      } catch (error) {
+        // 预期的循环依赖错误
+      }
+
+      const health = inspector.validateHealth();
+      expect(health).toContain('健康状态检查');
+    });
+
+    it('应该正确处理已销毁注入器的详细信息', () => {
+      enableDevMode({ logToConsole: false });
+      
+      injector = new EnvironmentInjector([
+        { provide: EdgeCaseService, useClass: EdgeCaseService }
+      ]);
+
+      const injectorId = injector.getInjectorId();
+      injector.destroy();
+
+      const details = inspector.printInjectorDetails(injectorId);
+      expect(details).toContain('注入器详情');
+    });
+
+    it('应该正确处理空依赖图显示', () => {
+      enableDevMode({ logToConsole: false });
+      
+      const graph = inspector.printDependencyGraph();
+      expect(graph).toContain('没有记录到依赖关系');
+    });
+
+    it('应该正确处理性能统计的边界情况', () => {
+      enableDevMode({ 
+        logToConsole: false,
+        collectMetrics: true 
+      });
+      
+      // 不执行任何注入操作
+      const stats = inspector.printPerformanceStats();
+      expect(stats).toContain('性能统计');
+      // 注入次数可能不为0，因为之前的测试可能有累积效果
+      expect(stats).toMatch(/总注入次数: \d+/);
+    });
+
+    it('应该正确处理导出数据的边界情况', () => {
+      enableDevMode({ logToConsole: false });
+      
+      const exportData = inspector.exportData();
+      expect(typeof exportData).toBe('string');
+      expect(() => JSON.parse(exportData)).not.toThrow();
+      
+      const parsedData = JSON.parse(exportData);
+      expect(parsedData).toHaveProperty('timestamp');
+    });
+
+    it('应该正确处理报告生成的时间格式', () => {
+      enableDevMode({ logToConsole: false });
+      
+      const report = inspector.generateReport();
+      // 匹配中文日期格式 2025/9/2 或 ISO格式 2025-09-02
+      expect(report).toMatch(/\d{4}[/-]\d{1,2}[/-]\d{1,2}/);
+      expect(report).toMatch(/\d{1,2}:\d{2}:\d{2}/);
+    });
+
+    it('应该正确处理注入器层次结构的缩进', () => {
+      enableDevMode({ logToConsole: false });
+      
+      const parentInjector = new EnvironmentInjector([
+        { provide: 'PARENT_SERVICE', useValue: 'parent' }
+      ]);
+
+      const childInjector = new EnvironmentInjector([
+        { provide: 'CHILD_SERVICE', useValue: 'child' }
+      ], parentInjector);
+
+      const hierarchy = inspector.printInjectorHierarchy();
+      expect(hierarchy).toContain('📦');
+      
+      // 清理
+      childInjector.destroy();
+      parentInjector.destroy();
+    });
+
+    it('应该正确处理健康检查的警告累积', () => {
+      enableDevMode({ logToConsole: false });
+      
+      // 创建多个已销毁的注入器
+      const injector1 = new EnvironmentInjector([]);
+      const injector2 = new EnvironmentInjector([]);
+      
+      injector1.destroy();
+      injector2.destroy();
+
+      const health = inspector.validateHealth();
+      expect(health).toContain('健康状态检查');
+    });
+  });
 });

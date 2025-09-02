@@ -351,34 +351,34 @@ export function getInspector(): DIInspector {
 /**
  * 便捷函数：打印注入器层次结构
  */
-export function printHierarchy(): void {
-  console.log(getInspector().printInjectorHierarchy());
+export function printHierarchy(): string {
+  return getInspector().printInjectorHierarchy();
 }
 
 /**
  * 便捷函数：打印性能统计
  */
-export function printStats(): void {
-  console.log(getInspector().printPerformanceStats());
+export function printStats(): string {
+  return getInspector().printPerformanceStats();
 }
 
 /**
  * 便捷函数：搜索令牌
  */
-export function searchTokens(term: string): void {
-  console.log(getInspector().searchTokens(term));
+export function searchTokens(term: string): string {
+  return getInspector().searchTokens(term);
 }
 
 /**
  * 便捷函数：健康检查
  */
-export function healthCheck(): void {
-  console.log(getInspector().validateHealth());
+export function healthCheck(): string {
+  return getInspector().validateHealth();
 }
 
 /**
  * 便捷函数：生成完整报告
  */
-export function generateReport(): void {
-  console.log(getInspector().generateReport());
+export function generateReport(): string {
+  return getInspector().generateReport();
 }

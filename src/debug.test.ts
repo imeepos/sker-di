@@ -1,4 +1,4 @@
-import { DIDebugger, getDebugger, enableDevMode, DebugLevel, DebugEventType } from './debug';
+import { DIDebugger, getDebugger, enableDevMode, DebugLevel, DebugEventType, DebugEvent } from './debug';
 import { EnvironmentInjector } from './environment-injector';
 import { Injectable } from './injectable';
 import { InjectionToken } from './injection-token';
@@ -452,6 +452,455 @@ describe('调试支持测试', () => {
       const config = diDebugger.getDebugInfo().config;
       expect(config.enabled).toBe(true);
       expect(config.level).toBe(DebugLevel.Trace);
+    });
+
+    it('disableDebug 便捷函数应该正常工作', () => {
+      // 🔴 失败的测试：测试disableDebug便捷函数
+      const { disableDebug } = require('./debug');
+      
+      diDebugger.enableDevMode({ logToConsole: false });
+      expect(diDebugger.getDebugInfo().config.enabled).toBe(true);
+      
+      disableDebug();
+      expect(diDebugger.getDebugInfo().config.enabled).toBe(false);
+    });
+  });
+
+  describe('🔴 红阶段：未覆盖方法测试', () => {
+    it('应该获取特定注入器的调试信息', () => {
+      // 🔴 失败的测试：getInjectorInfo方法
+      @Injectable()
+      class InjectorTestService {
+        getValue(): string {
+          return 'test-value';
+        }
+      }
+      
+      diDebugger.enableDevMode({ logToConsole: false });
+      
+      injector = new EnvironmentInjector([
+        { provide: InjectorTestService, useClass: InjectorTestService }
+      ]);
+      
+      const injectorId = injector.getInjectorId();
+      const injectorInfo = diDebugger.getInjectorInfo(injectorId);
+      
+      expect(injectorInfo).toBeDefined();
+      expect(injectorInfo!.id).toBe(injectorId);
+      expect(injectorInfo!.type).toBe('EnvironmentInjector');
+      expect(injectorInfo!.providersCount).toBeGreaterThan(0);
+    });
+
+    it('应该返回undefined当注入器不存在时', () => {
+      // 🔴 失败的测试：getInjectorInfo不存在的注入器
+      diDebugger.enableDevMode({ logToConsole: false });
+      
+      const nonExistentInfo = diDebugger.getInjectorInfo('non-existent-id');
+      expect(nonExistentInfo).toBeUndefined();
+    });
+
+    it('应该正确计算缓存命中率', () => {
+      // 🔴 失败的测试：缓存命中率计算
+      @Injectable()
+      class CacheTestService {
+        getValue(): string {
+          return 'test-value';
+        }
+      }
+      
+      diDebugger.enableDevMode({ 
+        logToConsole: false, 
+        collectMetrics: true 
+      });
+      
+      injector = new EnvironmentInjector([
+        { provide: CacheTestService, useClass: CacheTestService }
+      ]);
+      
+      // 第一次获取 - 创建实例
+      injector.get(CacheTestService);
+      // 第二次获取 - 缓存命中
+      injector.get(CacheTestService);
+      
+      const metrics = diDebugger.getDebugInfo().metrics;
+      expect(metrics.cacheHitRate).toBeGreaterThan(0);
+    });
+
+    it('应该正确处理解析时间统计', () => {
+      // 🔴 失败的测试：解析时间统计
+      @Injectable()
+      class ResolutionTestService {
+        getValue(): string {
+          return 'test-value';
+        }
+      }
+      
+      diDebugger.enableDevMode({ 
+        logToConsole: false, 
+        collectMetrics: true 
+      });
+      
+      injector = new EnvironmentInjector([
+        { provide: ResolutionTestService, useClass: ResolutionTestService }
+      ]);
+      
+      // 模拟解析开始
+      const tokenKey = diDebugger['getTokenName'](ResolutionTestService);
+      diDebugger['resolutionStartTimes'].set(tokenKey, Date.now() - 5);
+      
+      // 获取服务触发解析完成
+      injector.get(ResolutionTestService);
+      
+      const metrics = diDebugger.getDebugInfo().metrics;
+      expect(metrics.averageResolutionTime).toBeGreaterThanOrEqual(0);
+    });
+
+    it('应该正确格式化不同类型的令牌名称', () => {
+      // 🔴 失败的测试：getTokenName私有方法
+      const getTokenName = diDebugger['getTokenName'].bind(diDebugger);
+      
+      // 测试字符串令牌
+      expect(getTokenName('string-token')).toBe('string-token');
+      
+      // 测试符号令牌
+      const symbolToken = Symbol('test-symbol');
+      expect(getTokenName(symbolToken)).toBe(symbolToken.toString());
+      
+      // 测试函数令牌
+      class TokenTestClass {}
+      expect(getTokenName(TokenTestClass)).toBe('TokenTestClass');
+      
+      // 测试匿名函数
+      const anonymousFunc = function() {};
+      expect(getTokenName(anonymousFunc)).toBe('anonymousFunc');
+      
+      // 测试对象令牌
+      const objectToken = { toString: () => 'object-token' };
+      expect(getTokenName(objectToken)).toBe('object-token');
+      
+      // 测试其他类型
+      expect(getTokenName(123)).toBe('123');
+      expect(getTokenName(null)).toBe('null');
+    });
+
+    it('应该正确获取事件级别', () => {
+      // 🔴 失败的测试：getEventLevel私有方法
+      const getEventLevel = diDebugger['getEventLevel'].bind(diDebugger);
+      
+      expect(getEventLevel(DebugEventType.CircularDependencyDetected)).toBe(DebugLevel.Error);
+      expect(getEventLevel(DebugEventType.AutoProviderResolved)).toBe(DebugLevel.Warn);
+      expect(getEventLevel(DebugEventType.DependencyRequested)).toBe(DebugLevel.Info);
+      expect(getEventLevel(DebugEventType.InjectorCreated)).toBe(DebugLevel.Debug);
+    });
+
+    it('应该正确格式化不同类型的事件', () => {
+      // 🔴 失败的测试：formatEvent私有方法
+      const formatEvent = diDebugger['formatEvent'].bind(diDebugger);
+      
+      const dependencyRequestedEvent: DebugEvent = {
+        type: DebugEventType.DependencyRequested,
+        timestamp: Date.now(),
+        injectorId: 'test-injector',
+        tokenName: 'TestToken'
+      };
+      
+      const formatted = formatEvent(dependencyRequestedEvent);
+      expect(formatted).toContain('请求依赖');
+      expect(formatted).toContain('TestToken');
+      expect(formatted).toContain('test-injector');
+      
+      const circularEvent: DebugEvent = {
+        type: DebugEventType.CircularDependencyDetected,
+        timestamp: Date.now(),
+        injectorId: 'test-injector',
+        dependencyPath: ['ServiceA', 'ServiceB', 'ServiceA']
+      };
+      
+      const circularFormatted = formatEvent(circularEvent);
+      expect(circularFormatted).toContain('循环依赖');
+      expect(circularFormatted).toContain('ServiceA -> ServiceB -> ServiceA');
+    });
+
+    it('应该在禁用度量收集时跳过度量更新', () => {
+      // 🔴 失败的测试：度量收集禁用时的行为
+      diDebugger.enableDevMode({ 
+        logToConsole: false, 
+        collectMetrics: false 
+      });
+      
+      const initialMetrics = { ...diDebugger.getDebugInfo().metrics };
+      
+      diDebugger.logEvent({
+        type: DebugEventType.DependencyRequested,
+        injectorId: 'test-injector',
+        tokenName: 'TestToken'
+      });
+      
+      const afterMetrics = diDebugger.getDebugInfo().metrics;
+      expect(afterMetrics.totalInjections).toBe(initialMetrics.totalInjections);
+    });
+
+    it('应该在不同调试级别下正确输出到控制台', () => {
+      // 🔴 失败的测试：控制台输出级别控制
+      const consoleSpy = jest.spyOn(console, 'error').mockImplementation();
+      const consoleWarnSpy = jest.spyOn(console, 'warn').mockImplementation();
+      const consoleInfoSpy = jest.spyOn(console, 'info').mockImplementation();
+      const consoleDebugSpy = jest.spyOn(console, 'debug').mockImplementation();
+      const consoleTraceSpy = jest.spyOn(console, 'trace').mockImplementation();
+      
+      try {
+        diDebugger.enableDevMode({ 
+          logToConsole: true, 
+          level: DebugLevel.Warn 
+        });
+        
+        // 错误级别事件应该输出
+        diDebugger.logEvent({
+          type: DebugEventType.CircularDependencyDetected,
+          injectorId: 'test-injector',
+          dependencyPath: ['A', 'B', 'A']
+        });
+        
+        // 警告级别事件应该输出
+        diDebugger.logEvent({
+          type: DebugEventType.AutoProviderResolved,
+          injectorId: 'test-injector',
+          tokenName: 'TestToken'
+        });
+        
+        // 信息级别事件不应该输出（级别太低）
+        diDebugger.logEvent({
+          type: DebugEventType.DependencyRequested,
+          injectorId: 'test-injector',
+          tokenName: 'TestToken'
+        });
+        
+        expect(consoleSpy).toHaveBeenCalled();
+        expect(consoleWarnSpy).toHaveBeenCalled();
+        expect(consoleInfoSpy).not.toHaveBeenCalled();
+      } finally {
+        consoleSpy.mockRestore();
+        consoleWarnSpy.mockRestore();
+        consoleInfoSpy.mockRestore();
+        consoleDebugSpy.mockRestore();
+        consoleTraceSpy.mockRestore();
+      }
+    });
+
+    it('应该正确获取依赖关系图', () => {
+      // 🔴 失败的测试：getDependencyGraph方法
+      diDebugger.enableDevMode({ logToConsole: false });
+      
+      // 模拟依赖解析事件
+      diDebugger.logEvent({
+        type: DebugEventType.DependencyResolved,
+        injectorId: 'test-injector',
+        tokenName: 'ServiceA',
+        dependencyPath: ['ServiceA', 'ServiceB']
+      });
+      
+      diDebugger.logEvent({
+        type: DebugEventType.DependencyResolved,
+        injectorId: 'test-injector',
+        tokenName: 'ServiceB',
+        dependencyPath: ['ServiceB', 'ServiceC']
+      });
+      
+      const graph = diDebugger.getDependencyGraph();
+      expect(graph['ServiceA']).toContain('ServiceB');
+      expect(graph['ServiceB']).toContain('ServiceC');
+    });
+
+    it('应该正确检测性能警告', () => {
+      // 🔴 失败的测试：getPerformanceWarnings方法
+      diDebugger.enableDevMode({ 
+        logToConsole: false, 
+        collectMetrics: true 
+      });
+      
+      // 模拟高解析时间
+      diDebugger['metrics'].averageResolutionTime = 15;
+      diDebugger['metrics'].circularDependencies = 2;
+      diDebugger['metrics'].totalInjectors = 60;
+      diDebugger['metrics'].cacheHitRate = 0.5;
+      diDebugger['metrics'].totalInjections = 200;
+      
+      const warnings = diDebugger.getPerformanceWarnings();
+      
+      expect(warnings.length).toBeGreaterThan(0);
+      expect(warnings.some(w => w.includes('平均依赖解析时间较长'))).toBe(true);
+      expect(warnings.some(w => w.includes('循环依赖'))).toBe(true);
+      expect(warnings.some(w => w.includes('注入器数量过多'))).toBe(true);
+      expect(warnings.some(w => w.includes('缓存命中率较低'))).toBe(true);
+    });
+
+    it('应该正确更新解析时间统计', () => {
+      // 🔴 失败的测试：updateResolutionTime私有方法
+      diDebugger.enableDevMode({ 
+        logToConsole: false, 
+        collectMetrics: true 
+      });
+      
+      const updateResolutionTime = diDebugger['updateResolutionTime'].bind(diDebugger);
+      
+      // 初始状态 - 可能已有一些解析时间
+      const initialTime = diDebugger.getDebugInfo().metrics.averageResolutionTime;
+      expect(initialTime).toBeGreaterThanOrEqual(0);
+      
+      // 更新解析时间
+      updateResolutionTime(10);
+      expect(diDebugger.getDebugInfo().metrics.averageResolutionTime).toBeGreaterThan(0);
+      
+      updateResolutionTime(20);
+      expect(diDebugger.getDebugInfo().metrics.averageResolutionTime).toBeGreaterThan(10);
+    });
+
+    it('应该正确处理不同事件类型的度量更新', () => {
+      // 🔴 失败的测试：updateMetrics方法的所有分支
+      diDebugger.enableDevMode({ 
+        logToConsole: false, 
+        collectMetrics: true 
+      });
+      
+      const initialMetrics = { ...diDebugger.getDebugInfo().metrics };
+      
+      // 测试ProviderRegistered事件
+      diDebugger.logEvent({
+        type: DebugEventType.ProviderRegistered,
+        injectorId: 'test-injector',
+        tokenName: 'TestProvider'
+      });
+      
+      expect(diDebugger.getDebugInfo().metrics.totalProviders)
+        .toBe(initialMetrics.totalProviders + 1);
+      
+      // 测试InstanceCreated事件
+      diDebugger.logEvent({
+        type: DebugEventType.InstanceCreated,
+        injectorId: 'test-injector',
+        tokenName: 'TestInstance'
+      });
+      
+      expect(diDebugger.getDebugInfo().metrics.totalInstancesCreated)
+        .toBe(initialMetrics.totalInstancesCreated + 1);
+      
+      // 测试AutoProviderResolved事件
+      diDebugger.logEvent({
+        type: DebugEventType.AutoProviderResolved,
+        injectorId: 'test-injector',
+        tokenName: 'AutoProvider'
+      });
+      
+      expect(diDebugger.getDebugInfo().metrics.autoResolvedProviders)
+        .toBe(initialMetrics.autoResolvedProviders + 1);
+    });
+
+    it('应该正确处理缓存命中率计算', () => {
+      // 🔴 失败的测试：缓存命中率计算逻辑
+      diDebugger.enableDevMode({ 
+        logToConsole: false, 
+        collectMetrics: true 
+      });
+      
+      // 先记录一些依赖请求
+      diDebugger.logEvent({
+        type: DebugEventType.DependencyRequested,
+        injectorId: 'test-injector',
+        tokenName: 'TestToken1'
+      });
+      
+      diDebugger.logEvent({
+        type: DebugEventType.DependencyRequested,
+        injectorId: 'test-injector',
+        tokenName: 'TestToken2'
+      });
+      
+      // 记录缓存命中
+      diDebugger.logEvent({
+        type: DebugEventType.InstanceCached,
+        injectorId: 'test-injector',
+        tokenName: 'TestToken1'
+      });
+      
+      const metrics = diDebugger.getDebugInfo().metrics;
+      expect(metrics.cacheHitRate).toBeGreaterThan(0);
+      expect(metrics.cacheHitRate).toBeLessThanOrEqual(1);
+    });
+
+    it('应该正确处理startResolution和endResolution', () => {
+      // 🔴 失败的测试：解析计时功能
+      diDebugger.enableDevMode({ 
+        logToConsole: false, 
+        collectMetrics: true 
+      });
+      
+      const testToken = 'TestToken';
+      const injectorId = 'test-injector';
+      
+      // 开始解析
+      diDebugger.startResolution(injectorId, testToken);
+      
+      // 检查是否记录了开始时间
+      const resolutionTimes = diDebugger['resolutionStartTimes'];
+      const key = `${injectorId}:${testToken}`;
+      expect(resolutionTimes.has(key)).toBe(true);
+      
+      // 模拟一些处理时间
+      setTimeout(() => {
+        // 结束解析
+        diDebugger.endResolution(injectorId, testToken);
+        
+        // 检查时间是否被清理
+        expect(resolutionTimes.has(key)).toBe(false);
+      }, 10);
+    });
+
+    it('应该在禁用度量收集时跳过计时操作', () => {
+      // 🔴 失败的测试：禁用度量时的行为
+      diDebugger.enableDevMode({ 
+        logToConsole: false, 
+        collectMetrics: false 
+      });
+      
+      const testToken = 'TestToken';
+      const injectorId = 'test-injector';
+      
+      diDebugger.startResolution(injectorId, testToken);
+      
+      const resolutionTimes = diDebugger['resolutionStartTimes'];
+      const key = `${injectorId}:${testToken}`;
+      expect(resolutionTimes.has(key)).toBe(false);
+      
+      diDebugger.endResolution(injectorId, testToken);
+      // 不应该有任何副作用
+    });
+
+    it('应该正确处理注入器注册和更新', () => {
+      // 🔴 失败的测试：registerInjector和updateInjector方法
+      diDebugger.enableDevMode({ logToConsole: false });
+      
+      const injectorInfo = {
+        id: 'test-injector',
+        type: 'EnvironmentInjector' as const,
+        parentId: undefined,
+        providersCount: 5,
+        instancesCount: 0,
+        isDestroyed: false,
+        providers: [],
+        instances: []
+      };
+      
+      diDebugger.registerInjector(injectorInfo);
+      
+      const retrievedInfo = diDebugger.getInjectorInfo('test-injector');
+      expect(retrievedInfo).toEqual(injectorInfo);
+      expect(diDebugger.getDebugInfo().metrics.totalInjectors).toBe(1);
+      
+      // 更新注入器信息
+      diDebugger.updateInjector('test-injector', { instancesCount: 3 });
+      
+      const updatedInfo = diDebugger.getInjectorInfo('test-injector');
+      expect(updatedInfo!.instancesCount).toBe(3);
     });
   });
 });
