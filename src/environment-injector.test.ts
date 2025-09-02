@@ -27,6 +27,96 @@ describe('EnvironmentInjector', () => {
     expect(injector.parent).toBeInstanceOf(NullInjector);
   });
 
+  describe('🔴 红阶段：未覆盖代码测试', () => {
+    it('应该测试循环依赖检测', () => {
+      // 创建循环依赖的提供者
+      class ServiceA {
+        constructor(@Inject('ServiceB') public serviceB: any) {}
+      }
+      
+      class ServiceB {
+        constructor(@Inject('ServiceA') public serviceA: any) {}
+      }
+      
+      const injector = new EnvironmentInjector([
+        { provide: 'ServiceA', useClass: ServiceA },
+        { provide: 'ServiceB', useClass: ServiceB }
+      ]);
+      
+      expect(() => injector.get('ServiceA')).toThrow('检测到循环依赖');
+    });
+
+    it('应该测试自动解析providedIn服务', () => {
+      @Injectable({ providedIn: 'root' })
+      class AutoService {
+        getValue() { return 'auto-resolved'; }
+      }
+      
+      const injector = new EnvironmentInjector([]);
+      const instance = injector.get(AutoService);
+      
+      expect(instance).toBeInstanceOf(AutoService);
+      expect(instance.getValue()).toBe('auto-resolved');
+    });
+
+    it('应该测试宿主注入器委托', () => {
+      const hostInjector = new EnvironmentInjector([
+        { provide: 'HostService', useValue: 'host-value' }
+      ]);
+      
+      const childInjector = new EnvironmentInjector([], hostInjector);
+      
+      // 测试从宿主注入器获取服务
+      const result = (childInjector as any).getFromHost('HostService');
+      expect(result).toBe('host-value');
+    });
+
+    it('应该测试避免重复解析同一个类', () => {
+      @Injectable({ providedIn: 'root' })
+      class TestService {}
+      
+      const injector = new EnvironmentInjector([]);
+      
+      // 第一次解析
+      const instance1 = injector.get(TestService);
+      
+      // 第二次解析应该返回缓存的实例
+      const instance2 = injector.get(TestService);
+      
+      expect(instance1).toBe(instance2);
+    });
+
+    it('应该测试getProviderType方法', () => {
+      const injector = new EnvironmentInjector([]);
+      
+      // 测试不同类型的提供者
+      const valueProvider = { provide: 'test', useValue: 'value' };
+      const classProvider = { provide: 'test', useClass: class {} };
+      const factoryProvider = { provide: 'test', useFactory: () => 'factory' };
+      const existingProvider = { provide: 'test', useExisting: 'existing' };
+      
+      expect((injector as any).getProviderType(valueProvider)).toBe('ValueProvider');
+      expect((injector as any).getProviderType(classProvider)).toBe('ClassProvider');
+      expect((injector as any).getProviderType(factoryProvider)).toBe('FactoryProvider');
+      expect((injector as any).getProviderType(existingProvider)).toBe('ExistingProvider');
+    });
+
+    it('应该测试getTokenName方法', () => {
+      const injector = new EnvironmentInjector([]);
+      
+      // 测试不同类型的token
+      const stringToken = 'StringToken';
+      const symbolToken = Symbol('SymbolToken');
+      const classToken = class TestClass {};
+      const injectionToken = new InjectionToken('TestToken');
+      
+      expect((injector as any).getTokenName(stringToken)).toBe('StringToken');
+      expect((injector as any).getTokenName(symbolToken)).toBe('Symbol(SymbolToken)');
+      expect((injector as any).getTokenName(classToken)).toBe('TestClass');
+      expect((injector as any).getTokenName(injectionToken)).toBe('InjectionToken TestToken');
+    });
+  });
+
   it('应该能够通过值提供者获取依赖', () => {
     const providers: Provider[] = [
       { provide: stringToken, useValue: '测试值' }
@@ -792,6 +882,213 @@ describe('EnvironmentInjector', () => {
         expect(() => injector.get(token))
           .toThrow('NullInjector: No provider for InjectionToken EmptyMultiToken');
       });
+    });
+  });
+
+  describe('注入选项测试 - 覆盖未测试代码', () => {
+    it('应该测试self选项 - getSelf方法', () => {
+      // 🔴 失败的测试：测试self选项的行为
+      const parentProviders: Provider[] = [
+        { provide: stringToken, useValue: '父注入器值' }
+      ];
+      const parentInjector = new EnvironmentInjector(parentProviders);
+      
+      const childProviders: Provider[] = [
+        { provide: numberToken, useValue: 42 }
+      ];
+      const childInjector = new EnvironmentInjector(childProviders, parentInjector);
+      
+      // self选项应该只在当前注入器中查找
+      expect(() => (childInjector as any).getSelf(stringToken))
+        .toThrow('No provider for InjectionToken 字符串令牌!');
+      
+      // 正常情况下可以从父注入器获取
+      expect(childInjector.get(stringToken)).toBe('父注入器值');
+    });
+
+    it('应该测试host选项 - getFromHost方法', () => {
+      // 🔴 失败的测试：测试host选项的行为
+      const rootProviders: Provider[] = [
+        { provide: stringToken, useValue: '根注入器值' }
+      ];
+      const rootInjector = new EnvironmentInjector(rootProviders);
+      
+      const middleProviders: Provider[] = [
+        { provide: numberToken, useValue: 42 }
+      ];
+      const middleInjector = new EnvironmentInjector(middleProviders, rootInjector);
+      
+      const leafProviders: Provider[] = [
+        { provide: TestService, useClass: TestService }
+      ];
+      const leafInjector = new EnvironmentInjector(leafProviders, middleInjector);
+      
+      // host选项应该从根注入器获取
+      expect((leafInjector as any).getFromHost(stringToken)).toBe('根注入器值');
+    });
+
+    it('应该测试host选项在没有父注入器时的行为', () => {
+      // 🔴 失败的测试：测试host选项在根注入器的行为
+      const rootInjector = new EnvironmentInjector([]);
+      
+      // 如果当前注入器就是根注入器，host选项应该抛出错误
+      expect(() => (rootInjector as any).getFromHost(stringToken))
+        .toThrow('No provider for InjectionToken 字符串令牌!');
+    });
+
+    it('应该测试循环依赖检测 - resolveDepsWithCycleDetection', () => {
+      // 🔴 失败的测试：测试循环依赖检测
+      @Injectable()
+      class ServiceA {
+        constructor(@Inject('ServiceB') public serviceB: any) {}
+      }
+      
+      @Injectable()
+      class ServiceB {
+        constructor(@Inject('ServiceA') public serviceA: any) {}
+      }
+      
+      const providers: Provider[] = [
+        { provide: 'ServiceA', useClass: ServiceA },
+        { provide: 'ServiceB', useClass: ServiceB }
+      ];
+      
+      const injector = new EnvironmentInjector(providers);
+      
+      expect(() => injector.get('ServiceA'))
+        .toThrow(/检测到循环依赖/);
+    });
+  });
+
+  describe('自动提供者解析测试 - tryAutoResolveProvider', () => {
+    it('应该测试非函数类型token的处理', () => {
+      // 🔴 失败的测试：测试非函数类型token
+      const injector = new EnvironmentInjector([]);
+      
+      // 非函数类型的token应该无法自动解析
+      expect(() => injector.get('string-token'))
+        .toThrow('NullInjector: No provider for string-token');
+    });
+
+    it('应该测试已解析类的重复解析防护', () => {
+      // 🔴 失败的测试：测试重复解析防护
+      @Injectable({ providedIn: 'root' })
+      class AutoService {
+        static resolveCount = 0;
+        constructor() {
+          AutoService.resolveCount++;
+        }
+      }
+      
+      const injector = new EnvironmentInjector([]);
+      
+      // 第一次获取应该成功
+      const instance1 = injector.get(AutoService);
+      expect(instance1).toBeInstanceOf(AutoService);
+      
+      // 第二次获取应该返回缓存的实例
+      const instance2 = injector.get(AutoService);
+      expect(instance1).toBe(instance2);
+      expect(AutoService.resolveCount).toBe(1);
+    });
+
+    it('应该测试非root作用域的自动解析', () => {
+      // 🔴 失败的测试：测试非root作用域
+      @Injectable({ providedIn: 'platform' })
+      class PlatformService {}
+      
+      const injector = new EnvironmentInjector([]);
+      
+      // 非root作用域应该无法自动解析
+      expect(() => injector.get(PlatformService))
+        .toThrow('NullInjector: No provider for PlatformService');
+    });
+
+    it('应该测试带useFactory的自动解析', () => {
+      // 🔴 失败的测试：测试useFactory自动解析
+      const factoryFn = () => ({ value: 'factory-created' });
+      
+      @Injectable({ 
+        providedIn: 'root',
+        useFactory: factoryFn,
+        deps: []
+      })
+      class FactoryService {}
+      
+      const injector = new EnvironmentInjector([]);
+      const instance = injector.get(FactoryService);
+      
+      expect(instance).toEqual({ value: 'factory-created' });
+    });
+  });
+
+  describe('调试信息测试 - 覆盖调试相关方法', () => {
+    it('应该测试getTokenType方法的不同分支', () => {
+      // 🔴 失败的测试：测试token类型识别
+      const injector = new EnvironmentInjector([]);
+      const snapshot = injector.getDebugSnapshot();
+      
+      // 测试不同类型的token识别
+      expect(snapshot.id).toBeDefined();
+      expect(snapshot.type).toBe('EnvironmentInjector');
+    });
+
+    it('应该测试getProviderType方法的所有分支', () => {
+      // 🔴 失败的测试：测试提供者类型识别
+      const providers: Provider[] = [
+        { provide: 'value', useValue: 'test' },
+        { provide: 'class', useClass: TestService },
+        { provide: 'factory', useFactory: () => 'test', deps: [] },
+        { provide: 'existing', useExisting: 'value' }
+      ];
+      
+      const injector = new EnvironmentInjector(providers);
+      const snapshot = injector.getDebugSnapshot();
+      
+      expect(snapshot.providers).toHaveLength(4);
+      expect(snapshot.providers.some(p => p.providerType === 'ValueProvider')).toBe(true);
+      expect(snapshot.providers.some(p => p.providerType === 'ClassProvider')).toBe(true);
+      expect(snapshot.providers.some(p => p.providerType === 'FactoryProvider')).toBe(true);
+      expect(snapshot.providers.some(p => p.providerType === 'ExistingProvider')).toBe(true);
+    });
+
+    it('应该测试注入器销毁时的调试信息', () => {
+      // 🔴 失败的测试：测试销毁时的调试行为
+      class DestroyableService {
+        destroyed = false;
+        onDestroy() {
+          this.destroyed = true;
+        }
+      }
+      
+      const providers: Provider[] = [
+        { provide: DestroyableService, useClass: DestroyableService }
+      ];
+      
+      const injector = new EnvironmentInjector(providers);
+      const instance = injector.get(DestroyableService);
+      
+      expect(instance.destroyed).toBe(false);
+      
+      // 销毁注入器
+      injector.destroy();
+      
+      // 验证销毁状态
+      const snapshot = injector.getDebugSnapshot();
+      expect(snapshot.isDestroyed).toBe(true);
+      
+      // 重复销毁应该无效果
+      injector.destroy();
+      expect(snapshot.isDestroyed).toBe(true);
+    });
+
+    it('应该测试getInjectorId方法', () => {
+      // 🔴 失败的测试：测试注入器ID获取
+      const injector = new EnvironmentInjector([]);
+      const id = injector.getInjectorId();
+      
+      expect(typeof id).toBe('string');
+      expect(id.length).toBeGreaterThan(0);
     });
   });
 });
