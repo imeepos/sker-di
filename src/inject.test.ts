@@ -166,5 +166,37 @@ describe('@Inject 装饰器', () => {
       // 恢复原始实现
       jest.restoreAllMocks();
     });
+
+    it('应该测试getInjectMetadata的undefined分支', () => {
+      class TestClass {
+        constructor(param1: any, param2: any) {}
+      }
+
+      // 模拟paramTypes长度小于实际参数的情况
+      const originalParamTypes = Reflect.getMetadata('design:paramtypes', TestClass);
+      Reflect.defineMetadata('design:paramtypes', [String], TestClass); // 只定义一个类型
+
+      const metadata = getInjectMetadata(TestClass);
+
+      // 🔴 测试第二个参数返回undefined的分支
+      expect(metadata).toEqual([String, undefined]);
+
+      // 恢复原始元数据
+      if (originalParamTypes) {
+        Reflect.defineMetadata('design:paramtypes', originalParamTypes, TestClass);
+      }
+    });
+
+    it('应该测试没有paramTypes元数据的情况', () => {
+      class TestClassNoMetadata {
+        constructor() {}
+      }
+
+      // 确保没有paramTypes元数据
+      Reflect.deleteMetadata('design:paramtypes', TestClassNoMetadata);
+
+      const metadata = getInjectMetadata(TestClassNoMetadata);
+      expect(metadata).toBeUndefined();
+    });
   });
 });

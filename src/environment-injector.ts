@@ -7,13 +7,14 @@ import { InjectOptions } from './inject-options';
 import { isOnDestroy, OnDestroy } from './lifecycle';
 import { LazyManager } from './lazy-manager';
 import { resolveForwardRefCached, resolveForwardRefsInDeps, isForwardRef } from './forward-ref';
-import { 
-  getDebugger, 
-  DebugEventType, 
-  InjectorDebugInfo, 
-  ProviderDebugInfo, 
-  InstanceDebugInfo 
+import {
+  getDebugger,
+  DebugEventType,
+  InjectorDebugInfo,
+  ProviderDebugInfo,
+  InstanceDebugInfo
 } from './debug';
+import { EnvironmentInjectorUtils } from './environment-injector-utils';
 
 /**
  * 环境注入器，提供全局作用域的依赖管理
@@ -32,7 +33,7 @@ export class EnvironmentInjector extends Injector {
 
   constructor(providers: Provider[], parent?: Injector) {
     super(parent || new NullInjector());
-    this.injectorId = `injector_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    this.injectorId = EnvironmentInjectorUtils.generateInjectorId();
     this.setupProviders(providers);
     this.registerDebugInfo();
   }
@@ -127,7 +128,7 @@ export class EnvironmentInjector extends Injector {
       if (tokenProviders) {
         result = this.createInstance(resolvedToken, tokenProviders);
         // 非多值提供者才缓存实例
-        if (!this.isMultiProvider(tokenProviders)) {
+        if (!EnvironmentInjectorUtils.isMultiProvider(tokenProviders)) {
           this.instances.set(resolvedToken, result);
           // 更新调试信息
           this.updateDebugInfo();
@@ -225,10 +226,10 @@ export class EnvironmentInjector extends Injector {
    * 根据提供者创建实例
    */
   private createInstance<T>(token: InjectionTokenType<T>, providers: Provider[]): T {
-    if (this.isMultiProvider(providers)) {
+    if (EnvironmentInjectorUtils.isMultiProvider(providers)) {
       return providers.map(p => this.createSingleInstance(p)) as any;
     }
-    
+
     // 对于非多值注入，使用最后注册的提供者（后面的覆盖前面的）
     return this.createSingleInstance(providers[providers.length - 1]);
   }
@@ -325,12 +326,7 @@ export class EnvironmentInjector extends Injector {
    */
   private resolveDependency<T>(token: InjectionTokenType<T>, options: InjectOptions): T {
     // 验证互斥选项
-    if (options.self && options.skipSelf) {
-      throw new Error('InjectOptions: self 和 skipSelf 选项不能同时使用');
-    }
-    if (options.host && (options.self || options.skipSelf)) {
-      throw new Error('InjectOptions: host 选项不能与 self 或 skipSelf 同时使用');
-    }
+    EnvironmentInjectorUtils.validateInjectOptions(options);
 
     try {
       if (options.skipSelf) {
@@ -364,9 +360,11 @@ export class EnvironmentInjector extends Injector {
   private resolveDepsWithCycleDetection(currentToken: any, deps: any[]): any[] {
     // 检查循环依赖
     if (this.resolvingTokens.has(currentToken)) {
-      const tokenName = this.getTokenName(currentToken);
-      const pathStr = this.dependencyPath.map(t => this.getTokenName(t)).join(' -> ');
-      throw new Error(`检测到循环依赖: ${pathStr} -> ${tokenName}`);
+      throw EnvironmentInjectorUtils.generateCircularDependencyError(
+        currentToken,
+        this.dependencyPath,
+        (token) => this.getTokenName(token)
+      );
     }
 
     // 开始解析此令牌
@@ -383,12 +381,7 @@ export class EnvironmentInjector extends Injector {
     }
   }
 
-  /**
-   * 检查是否为多值提供者
-   */
-  private isMultiProvider(providers: Provider[]): boolean {
-    return providers.some(p => p.multi);
-  }
+
 
   /**
    * 只在当前注入器中查找，不查找父注入器
@@ -421,7 +414,7 @@ export class EnvironmentInjector extends Injector {
       if (tokenProviders) {
         const result = this.createInstance(token, tokenProviders);
         // 非多值提供者才缓存实例
-        if (!this.isMultiProvider(tokenProviders)) {
+        if (!EnvironmentInjectorUtils.isMultiProvider(tokenProviders)) {
           this.instances.set(token, result);
         }
         return result;
@@ -533,19 +526,7 @@ export class EnvironmentInjector extends Injector {
    * 获取令牌的可读名称，用于错误消息
    */
   private getTokenName(token: any): string {
-    if (typeof token === 'string') {
-      return token;
-    }
-    if (typeof token === 'symbol') {
-      return token.toString();
-    }
-    if (typeof token === 'function') {
-      return token.name || 'anonymous';
-    }
-    if (token && typeof token === 'object' && token.toString) {
-      return token.toString();
-    }
-    return String(token);
+    return EnvironmentInjectorUtils.getTokenName(token);
   }
 
   /**
@@ -630,42 +611,21 @@ export class EnvironmentInjector extends Injector {
    * 获取提供者调试信息
    */
   private getProvidersDebugInfo(): ProviderDebugInfo[] {
-    const providerInfos: ProviderDebugInfo[] = [];
-
-    for (const [token, providers] of this.providers.entries()) {
-      for (const provider of providers) {
-        providerInfos.push({
-          token: this.getTokenName(token),
-          tokenType: this.getTokenType(token),
-          providerType: this.getProviderType(provider),
-          isMulti: provider.multi || false,
-          isLazy: 'useLazyClass' in provider || 'useLazyFactory' in provider,
-          metadata: {
-            provider: provider
-          }
-        });
-      }
-    }
-
-    return providerInfos;
+    return EnvironmentInjectorUtils.generateProvidersDebugInfo(
+      this.providers,
+      (token) => this.getTokenName(token),
+      (token) => this.getTokenType(token)
+    );
   }
 
   /**
    * 获取实例调试信息
    */
   private getInstancesDebugInfo(): InstanceDebugInfo[] {
-    const instanceInfos: InstanceDebugInfo[] = [];
-
-    for (const [token, instance] of this.instances.entries()) {
-      instanceInfos.push({
-        token: this.getTokenName(token),
-        tokenName: this.getTokenName(token),
-        instanceType: instance?.constructor?.name || 'unknown',
-        createdAt: Date.now(), // 简化处理，实际可以记录具体创建时间
-        isLazy: false, // 缓存中的实例都不是延迟的
-        hasOnDestroy: isOnDestroy(instance)
-      });
-    }
+    const instanceInfos = EnvironmentInjectorUtils.generateInstancesDebugInfo(
+      this.instances,
+      (token) => this.getTokenName(token)
+    );
 
     // 添加延迟实例信息
     const lazyInstances = this.lazyManager.getInitializedInstances();
@@ -687,45 +647,10 @@ export class EnvironmentInjector extends Injector {
    * 获取令牌类型
    */
   private getTokenType(token: any): string {
-    if (typeof token === 'string') {
-      return 'string';
-    }
-    if (typeof token === 'symbol') {
-      return 'symbol';
-    }
-    if (typeof token === 'function') {
-      return 'class';
-    }
-    if (token && typeof token === 'object' && token.toString) {
-      return 'InjectionToken';
-    }
-    return 'unknown';
+    return EnvironmentInjectorUtils.getTokenType(token);
   }
 
-  /**
-   * 获取提供者类型
-   */
-  private getProviderType(provider: Provider): string {
-    if ('useValue' in provider) {
-      return 'ValueProvider';
-    }
-    if ('useClass' in provider) {
-      return 'ClassProvider';
-    }
-    if ('useFactory' in provider) {
-      return 'FactoryProvider';
-    }
-    if ('useExisting' in provider) {
-      return 'ExistingProvider';
-    }
-    if ('useLazyClass' in provider) {
-      return 'LazyClassProvider';
-    }
-    if ('useLazyFactory' in provider) {
-      return 'LazyFactoryProvider';
-    }
-    return 'ConstructorProvider';
-  }
+
 
   /**
    * 获取注入器ID（供调试使用）
@@ -741,8 +666,8 @@ export class EnvironmentInjector extends Injector {
     return {
       id: this.injectorId,
       type: 'EnvironmentInjector',
-      parentId: this.parent instanceof EnvironmentInjector 
-        ? (this.parent as any).injectorId 
+      parentId: this.parent instanceof EnvironmentInjector
+        ? (this.parent as any).injectorId
         : undefined,
       providersCount: this.providers.size,
       instancesCount: this.instances.size,
@@ -750,5 +675,12 @@ export class EnvironmentInjector extends Injector {
       providers: this.getProvidersDebugInfo(),
       instances: this.getInstancesDebugInfo()
     };
+  }
+
+  /**
+   * 获取提供者类型（用于测试）
+   */
+  getProviderType(provider: Provider): string {
+    return EnvironmentInjectorUtils.getProviderType(provider);
   }
 }

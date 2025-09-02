@@ -144,6 +144,19 @@ describe('调试支持测试', () => {
     const debugInfo = diDebugger.getDebugInfo();
     expect(debugInfo.recentEvents.length).toBeLessThanOrEqual(3);
   });
+
+  describe('🔴 红阶段：未覆盖分支测试', () => {
+    it('应该测试logToConsole为false时不输出到控制台', () => {
+      const diDebugger = getDebugger();
+      const consoleSpy = jest.spyOn(console, 'log').mockImplementation();
+
+      // 🔴 测试logToConsole为false的分支
+      diDebugger.enableDevMode({ logToConsole: false });
+
+      expect(consoleSpy).not.toHaveBeenCalled();
+      consoleSpy.mockRestore();
+    });
+  });
 });
 
 describe('🟢 绿阶段：注入器调试集成测试', () => {

@@ -230,5 +230,12 @@ describe('注入上下文管理', () => {
       // 最终回到null上下文
       expect(getCurrentInjectionContext()).toBeNull();
     });
+
+    describe('🔴 红阶段：未覆盖分支测试', () => {
+      it('应该测试空上下文的边界情况', () => {
+        // 🔴 测试空栈时getCurrentInjectionContext返回null
+        expect(getCurrentInjectionContext()).toBeNull();
+      });
+    });
   });
 });
