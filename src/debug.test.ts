@@ -1214,4 +1214,75 @@ describe('🔴 红阶段：未覆盖方法测试', () => {
     
     expect(level).toBe(DebugLevel.Debug);
   });
+
+  it('应该正确格式化没有构造函数名的实例事件', () => {
+    // 🔴 测试第491行：event.instance?.constructor?.name || 'unknown'
+    const diDebugger = getDebugger();
+    enableDevMode({ logToConsole: false });
+
+    // 创建一个没有constructor.name的对象
+    const instanceWithoutName = Object.create(null);
+    
+    const event: DebugEvent = {
+      type: DebugEventType.DependencyResolved,
+      tokenName: 'test-token',
+      instance: instanceWithoutName,
+      timestamp: Date.now(),
+      injectorId: 'test-injector-id'
+    };
+
+    const formatEvent = diDebugger['formatEvent'].bind(diDebugger);
+    const message = formatEvent(event);
+    
+    expect(message).toContain('unknown');
+  });
+
+  it('应该正确格式化实例创建事件的构造函数名', () => {
+    // 🔴 测试第493行：event.instance?.constructor?.name
+    const diDebugger = getDebugger();
+    enableDevMode({ logToConsole: false });
+
+    class TestClass {
+      constructor() {}
+    }
+
+    const instance = new TestClass();
+    
+    const event: DebugEvent = {
+      type: DebugEventType.InstanceCreated,
+      tokenName: 'TestClass',
+      instance: instance,
+      timestamp: Date.now(),
+      injectorId: 'test-injector-id'
+    };
+
+    const formatEvent = diDebugger['formatEvent'].bind(diDebugger);
+    const message = formatEvent(event);
+    
+    expect(message).toContain('TestClass');
+    expect(message).toContain('类型: TestClass');
+  });
+
+  it('应该正确格式化没有构造函数的实例创建事件', () => {
+    // 🔴 测试第493行：没有构造函数名的情况
+    const diDebugger = getDebugger();
+    enableDevMode({ logToConsole: false });
+
+    // 创建一个没有constructor的对象
+    const instanceWithoutConstructor = Object.create(null);
+    
+    const event: DebugEvent = {
+      type: DebugEventType.InstanceCreated,
+      tokenName: 'test-token',
+      instance: instanceWithoutConstructor,
+      timestamp: Date.now(),
+      injectorId: 'test-injector-id'
+    };
+
+    const formatEvent = diDebugger['formatEvent'].bind(diDebugger);
+    const message = formatEvent(event);
+    
+    expect(message).toContain('创建实例: test-token');
+    expect(message).toContain('类型: undefined'); // 没有constructor.name时应该是undefined
+  });
 });

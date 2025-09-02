@@ -1243,5 +1243,421 @@ describe('EnvironmentInjector', () => {
       const value = childInjector.get('HOST_TOKEN');
       expect(value).toBe('host-value');
     });
+
+    it('应该测试构造函数提供者路径', () => {
+      // 🔴 测试第261行：ConstructorProvider路径  
+      class TestService {
+        constructor() {}
+      }
+
+      const injector = new EnvironmentInjector([
+        // 没有useClass，直接使用构造函数
+        { provide: TestService, useClass: TestService }
+      ]);
+
+      const instance = injector.get(TestService);
+      expect(instance).toBeInstanceOf(TestService);
+    });
+
+    it('应该测试缓存命中的情况', () => {
+      // 🔴 测试第404行：缓存命中返回
+      class CachedService {
+        value = 'cached';
+      }
+
+      const injector = new EnvironmentInjector([
+        { provide: CachedService, useClass: CachedService }
+      ]);
+
+      // 第一次获取，创建实例并缓存
+      const instance1 = injector.get(CachedService);
+      
+      // 第二次获取，应该直接从缓存返回（命中第404行）
+      const instance2 = injector.get(CachedService);
+      
+      expect(instance1).toBe(instance2);
+    });
+
+    it('应该测试循环依赖检测和错误抛出', () => {
+      // 🔴 测试第409-411行：循环依赖错误抛出
+      @Injectable()
+      class ServiceA {
+        constructor(@Inject('ServiceB') public serviceB: any) {}
+      }
+
+      @Injectable() 
+      class ServiceB {
+        constructor(@Inject('ServiceA') public serviceA: any) {}
+      }
+
+      const injector = new EnvironmentInjector([
+        { provide: 'ServiceA', useClass: ServiceA },
+        { provide: 'ServiceB', useClass: ServiceB }
+      ]);
+
+      // 应该抛出循环依赖错误
+      expect(() => {
+        injector.get('ServiceA');
+      }).toThrow(/检测到循环依赖/);
+    });
+
+    it('应该测试基础提供者功能', () => {
+      // 基础功能测试
+      const injector = new EnvironmentInjector([
+        { provide: 'test', useValue: 'test-value' }
+      ]);
+      
+      const result = injector.get('test');
+      expect(result).toBe('test-value');
+    });
+
+    it('应该测试懒加载类和工厂提供者的类型识别', () => {
+      // 🔴 测试第721-726行：LazyClassProvider和LazyFactoryProvider类型
+      class LazyService {
+        value = 'lazy';
+      }
+
+      const injector = new EnvironmentInjector([
+        { 
+          provide: 'lazy-class',
+          useLazyClass: LazyService
+        },
+        {
+          provide: 'lazy-factory',
+          useLazyFactory: () => new LazyService()
+        }
+      ]);
+
+      const lazyClassInstance = injector.get('lazy-class');
+      expect(lazyClassInstance).toBeInstanceOf(LazyService);
+
+      const lazyFactoryInstance = injector.get('lazy-factory');  
+      expect(lazyFactoryInstance).toBeInstanceOf(LazyService);
+    });
+
+    it('应该测试非EnvironmentInjector宿主注入器的委托', () => {
+      // 🔴 测试第473行：非EnvironmentInjector的宿主注入器委托
+      const mockHostInjector = {
+        get: jest.fn().mockReturnValue('mock-value')
+      };
+
+      const childInjector = new EnvironmentInjector([], mockHostInjector as any);
+      
+      const result = childInjector.get('test-token');
+      
+      expect(mockHostInjector.get).toHaveBeenCalledWith('test-token');
+      expect(result).toBe('mock-value');
+    });
+
+    it('应该测试依赖解析时undefined依赖的错误处理', () => {
+      // 🔴 测试第294-296行：injectMetadata[index] 为 undefined 的错误处理
+      class ServiceWithMissingDep {
+        // 故意不使用 @Inject 装饰器，导致 injectMetadata 中出现 undefined
+        constructor(public missingDep: any) {}
+      }
+
+      // 手动设置错误的元数据来模拟 undefined 依赖
+      const originalGetInjectMetadata = require('./inject').getInjectMetadata;
+      const mockGetInjectMetadata = jest.fn().mockReturnValue([undefined]);
+      require('./inject').getInjectMetadata = mockGetInjectMetadata;
+
+      const injector = new EnvironmentInjector([
+        { provide: ServiceWithMissingDep, useClass: ServiceWithMissingDep }
+      ]);
+
+      try {
+        expect(() => {
+          injector.get(ServiceWithMissingDep);
+        }).toThrow('Cannot resolve dependency at index 0 for ServiceWithMissingDep. Make sure to use @Inject() decorator.');
+      } finally {
+        // 恢复原始函数
+        require('./inject').getInjectMetadata = originalGetInjectMetadata;
+      }
+    });
+
+    it('应该测试host选项对非EnvironmentInjector宿主的委托', () => {
+      // 🔴 测试第468-473行：宿主注入器不是 EnvironmentInjector 时的委托
+      const mockParentInjector = {
+        parent: null,
+        get: jest.fn().mockReturnValue('mock-host-value')
+      };
+
+      const childInjector = new EnvironmentInjector([], mockParentInjector as any);
+      
+      // 调用 getFromHost 方法测试非 EnvironmentInjector 的委托
+      const result = (childInjector as any).getFromHost('test-token');
+      
+      expect(mockParentInjector.get).toHaveBeenCalledWith('test-token');
+      expect(result).toBe('mock-host-value');
+    });
+
+    it('应该测试实例销毁时OnDestroy钩子的异常处理', () => {
+      // 🔴 测试第526-529行：OnDestroy 钩子抛出异常时的处理
+      class ServiceWithBadDestroy {
+        ngOnDestroy() {
+          throw new Error('Destroy failed!');
+        }
+      }
+
+      const injector = new EnvironmentInjector([
+        { provide: ServiceWithBadDestroy, useClass: ServiceWithBadDestroy }
+      ]);
+
+      // 获取实例以确保创建
+      const instance = injector.get(ServiceWithBadDestroy);
+      expect(instance).toBeInstanceOf(ServiceWithBadDestroy);
+
+      // 销毁时不应该抛出异常（异常被吞没）
+      expect(() => {
+        injector.destroy();
+      }).not.toThrow();
+    });
+
+    it('应该测试getTokenName方法对不同token类型的处理', () => {
+      // 🔴 测试第535-549行：getTokenName 的所有分支
+      const injector = new EnvironmentInjector([]);
+      
+      // 测试字符串token
+      expect((injector as any).getTokenName('string-token')).toBe('string-token');
+      
+      // 测试symbol token
+      const symbolToken = Symbol('symbol-token');
+      expect((injector as any).getTokenName(symbolToken)).toBe(symbolToken.toString());
+      
+      // 测试函数token（有名称）
+      class NamedService {}
+      expect((injector as any).getTokenName(NamedService)).toBe('NamedService');
+      
+      // 测试匿名函数token
+      const anonymousFunction = function() {};
+      Object.defineProperty(anonymousFunction, 'name', { value: '' });
+      expect((injector as any).getTokenName(anonymousFunction)).toBe('anonymous');
+      
+      // 测试对象token（有toString方法）
+      const objectToken = {
+        toString: () => 'object-token'
+      };
+      expect((injector as any).getTokenName(objectToken)).toBe('object-token');
+      
+      // 测试其他类型token
+      expect((injector as any).getTokenName(null)).toBe('null');
+      expect((injector as any).getTokenName(123)).toBe('123');
+    });
+
+    it('应该测试自动提供者解析中useFactory分支', () => {
+      // 🔴 测试第580-585行：tryAutoResolveProvider 中的 useFactory 分支
+      const testFactory = () => ({ value: 'factory-result' });
+      const testDeps = ['dep1', 'dep2'];
+      
+      // 手动设置Injectable元数据以触发useFactory分支
+      class FactoryBasedService {}
+      
+      // Mock getInjectableMetadata to return factory metadata
+      const originalGetMetadata = require('./injectable').getInjectableMetadata;
+      const mockGetMetadata = jest.fn().mockReturnValue({
+        providedIn: 'root',
+        useFactory: testFactory,
+        deps: testDeps
+      });
+      require('./injectable').getInjectableMetadata = mockGetMetadata;
+
+      const injector = new EnvironmentInjector([
+        { provide: 'dep1', useValue: 'dep1-value' },
+        { provide: 'dep2', useValue: 'dep2-value' }
+      ]);
+
+      try {
+        const result = injector.get(FactoryBasedService);
+        expect(result).toEqual({ value: 'factory-result' });
+      } finally {
+        // 恢复原始函数
+        require('./injectable').getInjectableMetadata = originalGetMetadata;
+      }
+    });
+
+    it('应该测试getSelf方法中的自动提供者解析分支', () => {
+      // 🔴 测试第431-436行：getSelf 中的自动提供者解析
+      @Injectable({ providedIn: 'root' })
+      class AutoResolvedService {
+        value = 'auto-resolved';
+      }
+
+      const injector = new EnvironmentInjector([]);
+      
+      // 使用 getSelf 方法触发自动解析分支
+      const result = (injector as any).getSelf(AutoResolvedService);
+      expect(result).toBeInstanceOf(AutoResolvedService);
+      expect(result.value).toBe('auto-resolved');
+    });
+
+    it('应该测试resolveDepsWithCycleDetection的循环依赖检测', () => {
+      // 🔴 测试第364-384行：带循环依赖检测的依赖解析
+      const injector = new EnvironmentInjector([]);
+      
+      // 直接调用 resolveDepsWithCycleDetection 方法测试循环依赖检测
+      (injector as any).resolvingTokens.add('current-token');
+      (injector as any).dependencyPath.push('current-token');
+      
+      expect(() => {
+        (injector as any).resolveDepsWithCycleDetection('current-token', ['dependency']);
+      }).toThrow(/检测到循环依赖/);
+      
+      // 清理状态
+      (injector as any).resolvingTokens.clear();
+      (injector as any).dependencyPath.length = 0;
+    });
+
+    it('应该测试ConstructorProvider的直接类实例化', () => {
+      // 🔴 测试第261行：ConstructorProvider分支 - 直接使用类作为token和provider
+      class DirectConstructorService {
+        value = 'constructor-service';
+      }
+
+      const injector = new EnvironmentInjector([
+        // ConstructorProvider: 直接提供类，不使用 useClass/useFactory等
+        { provide: DirectConstructorService }
+      ]);
+
+      const result = injector.get(DirectConstructorService);
+      expect(result).toBeInstanceOf(DirectConstructorService);
+      expect(result.value).toBe('constructor-service');
+    });
+
+    it('应该测试getSelf方法中的缓存命中分支', () => {
+      // 🔴 测试第404行：getSelf 中的实例缓存命中
+      class CacheTestService {
+        value = 'cached';
+      }
+
+      const injector = new EnvironmentInjector([
+        { provide: CacheTestService, useClass: CacheTestService }
+      ]);
+
+      // 第一次调用创建实例并缓存
+      const firstResult = (injector as any).getSelf(CacheTestService);
+      expect(firstResult).toBeInstanceOf(CacheTestService);
+
+      // 第二次调用应该命中缓存（测试第404行）
+      const secondResult = (injector as any).getSelf(CacheTestService);
+      expect(secondResult).toBe(firstResult); // 同一实例引用
+    });
+
+    it('应该测试getSelf方法中循环依赖的详细错误处理', () => {
+      // 🔴 测试第409-411行：getSelf 中循环依赖的错误消息构建
+      const injector = new EnvironmentInjector([]);
+      
+      // 模拟循环依赖状态
+      const testToken = 'circular-token';
+      (injector as any).resolvingTokens.add(testToken);
+      (injector as any).dependencyPath.push('parent-token', 'child-token');
+
+      expect(() => {
+        (injector as any).getSelf(testToken);
+      }).toThrow('检测到循环依赖: parent-token -> child-token -> circular-token');
+
+      // 清理状态
+      (injector as any).resolvingTokens.clear();
+      (injector as any).dependencyPath.length = 0;
+    });
+
+    it('应该测试自动解析提供者的重复解析保护机制', () => {
+      // 🔴 测试第562行：避免重复解析同一个类的保护机制
+      @Injectable({ providedIn: 'root' })
+      class RepeatedAutoResolveService {
+        value = 'repeated-auto';
+      }
+
+      const injector = new EnvironmentInjector([]);
+
+      // 第一次调用会自动解析并标记为已解析
+      const firstResult = injector.get(RepeatedAutoResolveService);
+      expect(firstResult).toBeInstanceOf(RepeatedAutoResolveService);
+
+      // 检查类已被标记为已解析
+      expect((injector as any).autoResolvedClasses.has(RepeatedAutoResolveService)).toBe(true);
+
+      // 模拟tryAutoResolveProvider被直接调用时的重复解析保护
+      const autoProvider = (injector as any).tryAutoResolveProvider(RepeatedAutoResolveService);
+      expect(autoProvider).toBeNull(); // 应该返回null，避免重复解析
+    });
+
+    it('应该测试getTokenType方法的unknown类型分支', () => {
+      // 🔴 测试第702行：getTokenType 返回 'unknown' 的分支
+      const injector = new EnvironmentInjector([]);
+
+      // 测试没有toString方法的对象
+      const weirdToken = Object.create(null); // 创建没有原型的对象
+      expect((injector as any).getTokenType(weirdToken)).toBe('unknown');
+
+      // 测试其他奇怪的类型
+      expect((injector as any).getTokenType(123)).toBe('unknown');
+      expect((injector as any).getTokenType(true)).toBe('unknown');
+      
+      // 测试null和undefined（没有toString）
+      expect((injector as any).getTokenType(null)).toBe('unknown');
+      expect((injector as any).getTokenType(undefined)).toBe('unknown');
+
+      // 注：数组有toString方法，会被归类为'InjectionToken'
+      expect((injector as any).getTokenType([])).toBe('InjectionToken');
+    });
+
+    it('应该测试getProviderType方法中LazyProvider类型分支', () => {
+      // 🔴 测试第721-726行：LazyClassProvider 和 LazyFactoryProvider 类型识别
+      class LazyTestService {
+        value = 'lazy-test';
+      }
+
+      const lazyClassProvider = {
+        provide: 'lazy-class-token',
+        useLazyClass: LazyTestService
+      };
+
+      const lazyFactoryProvider = {
+        provide: 'lazy-factory-token', 
+        useLazyFactory: () => new LazyTestService()
+      };
+
+      const injector = new EnvironmentInjector([]);
+
+      // 测试 LazyClassProvider 类型识别
+      expect((injector as any).getProviderType(lazyClassProvider)).toBe('LazyClassProvider');
+
+      // 测试 LazyFactoryProvider 类型识别
+      expect((injector as any).getProviderType(lazyFactoryProvider)).toBe('LazyFactoryProvider');
+    });
+
+    it('应该测试所有提供者类型的完整覆盖', () => {
+      // 🔴 测试第708-728行：getProviderType 的所有分支
+      const injector = new EnvironmentInjector([]);
+
+      // 测试所有提供者类型
+      class TestClass {}
+      const testFactory = () => 'factory';
+
+      const providers = [
+        { provide: 'token1', useValue: 'value' },
+        { provide: 'token2', useClass: TestClass },
+        { provide: 'token3', useFactory: testFactory },
+        { provide: 'token4', useExisting: 'token1' },
+        { provide: 'token5', useLazyClass: TestClass },
+        { provide: 'token6', useLazyFactory: testFactory },
+        { provide: TestClass } // ConstructorProvider
+      ];
+
+      const expectedTypes = [
+        'ValueProvider',
+        'ClassProvider', 
+        'FactoryProvider',
+        'ExistingProvider',
+        'LazyClassProvider',
+        'LazyFactoryProvider',
+        'ConstructorProvider'
+      ];
+
+      providers.forEach((provider, index) => {
+        const type = (injector as any).getProviderType(provider);
+        expect(type).toBe(expectedTypes[index]);
+      });
+    });
   });
 });

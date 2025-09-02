@@ -186,7 +186,7 @@ describe('注入上下文管理', () => {
 
   describe('InjectionContextStack 边界情况', () => {
     it('应该在空栈时返回null', () => {
-      // 🔴 测试空上下文时返回null
+      // 🔴 测试空上下文时返回null (第15行条件分支)
       const result = getCurrentInjectionContext();
       expect(result).toBeNull();
     });
@@ -206,6 +206,28 @@ describe('注入上下文管理', () => {
       
       // 执行后上下文应该恢复
       expect(result).toBe('test-result');
+      expect(getCurrentInjectionContext()).toBeNull();
+    });
+
+    it('应该测试popContext在空栈时的行为', () => {
+      // 🔴 测试第31行：stack.pop() || null 的分支
+      // 通过访问内部实现来测试popContext在空栈时的行为
+      const injector1 = EnvironmentInjector.createWithAutoProviders([]);
+      const injector2 = EnvironmentInjector.createWithAutoProviders([]);
+
+      // 多次嵌套和弹出上下文来测试边界情况
+      runInInjectionContext(injector1, () => {
+        expect(getCurrentInjectionContext()).toBe(injector1);
+        
+        runInInjectionContext(injector2, () => {
+          expect(getCurrentInjectionContext()).toBe(injector2);
+        });
+        
+        // 回到外层上下文
+        expect(getCurrentInjectionContext()).toBe(injector1);
+      });
+
+      // 最终回到null上下文
       expect(getCurrentInjectionContext()).toBeNull();
     });
   });

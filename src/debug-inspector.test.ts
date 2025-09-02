@@ -743,5 +743,213 @@ describe('调试检查器测试', () => {
       const parsedData = JSON.parse(exportData);
       expect(parsedData).toHaveProperty('timestamp');
     });
+
+    it('应该处理没有父注入器的注入器层次结构', () => {
+      enableDevMode({ logToConsole: false });
+      
+      injector = new EnvironmentInjector([
+        { provide: 'test', useValue: 'test-value' }
+      ]);
+      
+      // 获取注入器信息，此时childMap.has(inj.parentId)为false的情况
+      const hierarchy = inspector.printInjectorHierarchy();
+      expect(hierarchy).toContain('📦');
+    });
+
+    it('应该处理注入器详情的条件分支', () => {
+      enableDevMode({ logToConsole: false });
+      
+      injector = new EnvironmentInjector([
+        { provide: 'test', useValue: 'test-value' }
+      ]);
+      
+      // 测试不指定injectorId的情况 (行91的分支)
+      const details = inspector.printInjectorDetails();
+      expect(details).toContain('注入器详情');
+      
+      // 测试指定不存在injectorId的情况
+      const nonExistentDetails = inspector.printInjectorDetails('non-existent');
+      expect(nonExistentDetails).toContain('未找到注入器');
+    });
+
+    it('应该测试childMap父子关系构建的分支逻辑', () => {
+      // 🔴 测试第39行：childMap.has(inj.parentId)的false分支
+      enableDevMode({ logToConsole: false });
+
+      // 创建父子注入器来触发childMap逻辑
+      const parentInjector = new EnvironmentInjector([
+        { provide: 'parent-service', useValue: 'parent-value' }
+      ]);
+
+      const childInjector1 = new EnvironmentInjector([
+        { provide: 'child-service-1', useValue: 'child-value-1' }
+      ], parentInjector);
+
+      const childInjector2 = new EnvironmentInjector([
+        { provide: 'child-service-2', useValue: 'child-value-2' }  
+      ], parentInjector);
+
+      // 这将触发childMap构建逻辑，包括第39行的分支
+      const hierarchy = inspector.printInjectorHierarchy();
+      expect(hierarchy).toContain('依赖注入器层次结构');
+      expect(hierarchy).toContain('EnvironmentInjector');
+
+      // 清理
+      childInjector2.destroy();
+      childInjector1.destroy();
+      parentInjector.destroy();
+    });
+
+    it('应该测试懒加载提供者标志显示', () => {
+      // 🔴 测试第123行：provider.isLazy为true的分支
+      enableDevMode({ logToConsole: false });
+
+      // 直接测试DIInspector的renderInjectorDetails方法对isLazy标志的处理
+      const mockInjectorInfo = {
+        id: 'test-injector',
+        type: 'EnvironmentInjector',
+        isDestroyed: false,
+        parentId: undefined,
+        providersCount: 2,
+        instancesCount: 0,
+        providers: [
+          {
+            token: 'lazy-provider',
+            tokenType: 'string', 
+            providerType: 'LazyClassProvider',
+            isMulti: false,
+            isLazy: true, // 这个标志是关键
+            metadata: {}
+          },
+          {
+            token: 'regular-provider',
+            tokenType: 'string',
+            providerType: 'ValueProvider', 
+            isMulti: false,
+            isLazy: false,
+            metadata: {}
+          }
+        ],
+        instances: []
+      };
+
+      // 直接调用private方法进行测试
+      const details = (inspector as any).renderInjectorDetails(mockInjectorInfo);
+      expect(details).toContain('[lazy]'); // 验证lazy标志显示
+      expect(details).toContain('lazy-provider');
+    });
+
+    it('应该测试实例标志的组合显示', () => {
+      // 🔴 测试第136-138行：实例的isLazy和hasOnDestroy标志组合
+      enableDevMode({ logToConsole: false });
+
+      @Injectable()
+      class ServiceWithDestroy {
+        ngOnDestroy() {
+          // OnDestroy hook
+        }
+      }
+
+      class LazyServiceWithDestroy {
+        ngOnDestroy() {
+          // OnDestroy hook
+        }
+      }
+
+      injector = new EnvironmentInjector([
+        { provide: ServiceWithDestroy, useClass: ServiceWithDestroy },
+        { provide: 'lazy-with-destroy', useLazyClass: LazyServiceWithDestroy }
+      ]);
+
+      // 创建普通实例
+      injector.get(ServiceWithDestroy);
+      // 创建懒加载实例  
+      injector.get('lazy-with-destroy');
+
+      const details = inspector.printInjectorDetails();
+      expect(details).toContain('[OnDestroy]'); // 测试OnDestroy标志
+    });
+
+    it('应该测试搜索时匹配instanceType的分支', () => {
+      // 🔴 测试第230行：搜索匹配instanceType而非tokenName的分支
+      enableDevMode({ logToConsole: false });
+
+      class UniqueInstanceTypeService {
+        value = 'unique';
+      }
+
+      injector = new EnvironmentInjector([
+        { provide: 'generic-token', useClass: UniqueInstanceTypeService }
+      ]);
+
+      // 创建实例以便搜索
+      injector.get('generic-token');
+
+      // 搜索instanceType而非tokenName
+      const searchResult = inspector.searchTokens('UniqueInstanceType');
+      expect(searchResult).toContain('搜索结果');
+      expect(searchResult).toContain('UniqueInstanceTypeService'); 
+    });
+
+    it('应该测试搜索时的复合匹配逻辑', () => {
+      // 🔴 测试搜索功能的完整分支覆盖
+      enableDevMode({ logToConsole: false });
+
+      class SearchTestService {
+        value = 'search-test';
+      }
+
+      injector = new EnvironmentInjector([
+        { provide: 'SEARCH_TOKEN', useValue: 'search-value' },
+        { provide: 'search-service', useClass: SearchTestService }
+      ]);
+
+      // 创建实例
+      injector.get('search-service');
+
+      // 测试tokenName匹配
+      const tokenResult = inspector.searchTokens('SEARCH_TOKEN');
+      expect(tokenResult).toContain('SEARCH_TOKEN');
+
+      // 测试instanceType匹配  
+      const instanceResult = inspector.searchTokens('SearchTest');
+      expect(instanceResult).toContain('SearchTestService');
+
+      // 测试大小写不敏感匹配
+      const caseResult = inspector.searchTokens('searchtestservice');
+      expect(caseResult).toContain('搜索结果');
+    });
+
+    it('应该处理基础调试信息显示', () => {
+      enableDevMode({ logToConsole: false });
+
+      injector = new EnvironmentInjector([
+        { provide: 'test-token', useValue: 'test-value' }
+      ]);
+      
+      injector.get('test-token');
+      
+      const details = inspector.printInjectorDetails();
+      expect(details).toContain('test-token');
+    });
+
+    it('应该处理实例详细信息显示', () => {
+      enableDevMode({ logToConsole: false });
+
+      @Injectable()
+      class TestService {
+        value = 'test';
+      }
+
+      injector = new EnvironmentInjector([
+        { provide: TestService, useClass: TestService }
+      ]);
+      
+      injector.get(TestService);
+      
+      // 测试实例详情显示包含TestService类名
+      const details = inspector.printInjectorDetails();
+      expect(details).toContain('TestService');
+    });
   });
 });
