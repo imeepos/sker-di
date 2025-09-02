@@ -1,0 +1,25 @@
+{
+  "name": "@sker/di",
+  "version": "1.0.0",
+  "description": "现代化的 TypeScript 依赖注入(DI)系统，借鉴 Angular DI 核心设计理念",
+  "main": "dist/index.js",
+  "types": "index.d.ts",
+  "scripts": {
+    "test": "jest",
+    "test:watch": "jest --watch",
+    "test:coverage": "jest --coverage",
+    "build": "tsc"
+  },
+  "keywords": ["dependency-injection", "di", "typescript", "angular", "ioc", "container"],
+  "author": "imeepos",
+  "license": "ISC",
+  "devDependencies": {
+    "@types/jest": "^30.0.0",
+    "jest": "^30.1.2",
+    "ts-jest": "^29.4.1",
+    "typescript": "^5.9.2"
+  },
+  "dependencies": {
+    "reflect-metadata": "^0.2.2"
+  }
+}
