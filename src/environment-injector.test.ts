@@ -1090,5 +1090,158 @@ describe('EnvironmentInjector', () => {
       expect(typeof id).toBe('string');
       expect(id.length).toBeGreaterThan(0);
     });
+
+    it('应该测试useExisting提供者', () => {
+      // 🔴 测试useExisting分支
+      const ORIGINAL_TOKEN = new InjectionToken<string>('ORIGINAL');
+      const ALIAS_TOKEN = new InjectionToken<string>('ALIAS');
+      
+      const injector = new EnvironmentInjector([
+        { provide: ORIGINAL_TOKEN, useValue: 'original-value' },
+        { provide: ALIAS_TOKEN, useExisting: ORIGINAL_TOKEN }
+      ]);
+      
+      const original = injector.get(ORIGINAL_TOKEN);
+      const alias = injector.get(ALIAS_TOKEN);
+      
+      expect(original).toBe('original-value');
+      expect(alias).toBe(original);
+    });
+
+    it('应该测试构造函数提供者的默认分支', () => {
+      // 🔴 测试ConstructorProvider分支
+      class SimpleService {
+        getValue(): string {
+          return 'simple';
+        }
+      }
+      
+      const injector = new EnvironmentInjector([
+        { provide: SimpleService, useClass: SimpleService }
+      ]);
+      
+      const instance = injector.get(SimpleService);
+      expect(instance).toBeInstanceOf(SimpleService);
+      expect(instance.getValue()).toBe('simple');
+    });
+
+    it('应该测试依赖注入中的类型检查错误', () => {
+      // 🔴 测试createInstanceWithDI中的错误处理
+      class InvalidService {
+        constructor(@Inject('INVALID_TOKEN') public dep: any) {}
+      }
+      
+      const injector = new EnvironmentInjector([]);
+      
+      expect(() => {
+        (injector as any).createInstanceWithDI(InvalidService);
+      }).toThrow();
+    });
+
+    it('应该测试多值提供者的边界情况', () => {
+      // 🔴 测试多值提供者的特殊情况
+      const MULTI_TOKEN = new InjectionToken<string[]>('MULTI');
+      
+      const injector = new EnvironmentInjector([
+        { provide: MULTI_TOKEN, useValue: 'value1', multi: true },
+        { provide: MULTI_TOKEN, useValue: 'value2', multi: true }
+      ]);
+      
+      const values = injector.get(MULTI_TOKEN);
+      expect(Array.isArray(values)).toBe(true);
+      expect(values).toEqual(['value1', 'value2']);
+    });
+
+    it('应该测试令牌名称获取的边界情况', () => {
+      // 🔴 测试getTokenName方法的不同分支
+      const injector = new EnvironmentInjector([]);
+      const getTokenName = (injector as any).getTokenName.bind(injector);
+      
+      // 测试字符串令牌
+      expect(getTokenName('string-token')).toBe('string-token');
+      
+      // 测试函数令牌
+      class TestClass {}
+      expect(getTokenName(TestClass)).toBe('TestClass');
+      
+      // 测试InjectionToken
+      const token = new InjectionToken('test-token');
+      expect(getTokenName(token)).toContain('test-token');
+      
+      // 测试其他类型
+      expect(getTokenName(123)).toBe('123');
+    });
+
+    it('应该测试resolveDepsWithCycleDetection方法', () => {
+      // 🔴 测试第364-382行：循环依赖检测逻辑
+      const injector = new EnvironmentInjector([]);
+      const resolveDepsWithCycleDetection = (injector as any).resolveDepsWithCycleDetection.bind(injector);
+      
+      // 模拟循环依赖状态
+      (injector as any).resolvingTokens.add('test-token');
+      
+      expect(() => {
+        resolveDepsWithCycleDetection('test-token', []);
+      }).toThrow('检测到循环依赖');
+    });
+
+    it('应该测试tryAutoResolveProvider的成功分支', () => {
+      // 🔴 测试第426-433行：自动解析providedIn服务
+      @Injectable({ providedIn: 'root' })
+      class AutoService {
+        getValue(): string {
+          return 'auto';
+        }
+      }
+      
+      const injector = new EnvironmentInjector([]);
+      const instance = injector.get(AutoService);
+      
+      expect(instance).toBeInstanceOf(AutoService);
+      expect(instance.getValue()).toBe('auto');
+    });
+
+    it('应该测试非多值提供者的缓存逻辑', () => {
+      // 🔴 测试第422-425行：非多值提供者才缓存实例
+      class CacheableService {
+        constructor(public id: number = Math.random()) {}
+      }
+      
+      const injector = new EnvironmentInjector([
+        { provide: CacheableService, useClass: CacheableService }
+      ]);
+      
+      const instance1 = injector.get(CacheableService);
+      const instance2 = injector.get(CacheableService);
+      
+      // 应该返回同一个缓存实例
+      expect(instance1).toBe(instance2);
+      expect(instance1.id).toBe(instance2.id);
+    });
+
+    it('应该测试销毁逻辑的重复调用保护', () => {
+      // 🔴 测试第479-481行：防止重复销毁
+      const injector = new EnvironmentInjector([]);
+      
+      // 第一次销毁
+      injector.destroy();
+      expect((injector as any).isDestroyed).toBe(true);
+      
+      // 重复销毁应该无效果（不抛出错误）
+      expect(() => injector.destroy()).not.toThrow();
+    });
+
+    it('应该测试宿主注入器的委托逻辑', () => {
+      // 🔴 测试第473行：委托给宿主注入器的get方法
+      const hostInjector = new EnvironmentInjector([
+        { provide: 'HOST_TOKEN', useValue: 'host-value' }
+      ]);
+      
+      const childInjector = new EnvironmentInjector([], hostInjector);
+      
+      // 子注入器应该能够从宿主注入器获取令牌
+      const value = childInjector.get('HOST_TOKEN');
+      expect(value).toBe('host-value');
+    });
   });
 });

@@ -84,4 +84,87 @@ describe('@Inject 装饰器', () => {
     const metadata = getInjectMetadata(PlainService);
     expect(metadata).toBeUndefined();
   });
+
+  describe('🔴 红阶段：未覆盖分支测试', () => {
+    it('应该测试带有注入选项的装饰器', () => {
+      // 🔴 测试options分支
+      const { getInjectOptionsMetadata } = require('./inject');
+      
+      class ServiceWithOptions {
+        constructor(
+          @Inject(testToken, { optional: true }) public value: string
+        ) {}
+      }
+
+      const options = getInjectOptionsMetadata(ServiceWithOptions);
+      expect(options).toBeDefined();
+      expect(options?.[0]).toEqual({ optional: true });
+    });
+
+    it('应该测试hasInjectMetadata函数', () => {
+      // 🔴 测试hasInjectMetadata的不同分支
+      const { hasInjectMetadata } = require('./inject');
+      
+      class ServiceWithInject {
+        constructor(@Inject(testToken) public value: string) {}
+      }
+      
+      // 创建一个没有任何元数据的普通对象
+      const plainObject = {};
+      
+      expect(hasInjectMetadata(ServiceWithInject)).toBe(true);
+      expect(hasInjectMetadata(plainObject)).toBe(false); // 没有任何元数据
+    });
+
+    it('应该测试getInjectMetadata的边界情况', () => {
+      // 🔴 测试maxLength为0的情况
+      const mockTarget = {};
+      
+      // 模拟没有元数据的情况
+      jest.spyOn(Reflect, 'getMetadata').mockImplementation(() => undefined);
+      
+      const metadata = getInjectMetadata(mockTarget);
+      expect(metadata).toBeUndefined();
+      
+      // 恢复原始实现
+      jest.restoreAllMocks();
+    });
+
+    it('应该测试参数索引超出现有数组长度的情况', () => {
+      // 🔴 测试while循环扩展数组的分支
+      class ServiceWithGaps {
+        constructor(
+          public param0: string,
+          public param1: string,
+          @Inject(testToken) public param2: string
+        ) {}
+      }
+
+      const metadata = getInjectMetadata(ServiceWithGaps);
+      expect(metadata).toBeDefined();
+      expect(metadata?.length).toBe(3);
+      expect(metadata?.[2]).toBe(testToken);
+    });
+
+    it('应该测试只有paramTypes没有injectTokens的情况', () => {
+      // 🔴 测试只有TypeScript类型推断的分支
+      const mockTarget = {};
+      
+      // 模拟只有paramTypes的情况
+      jest.spyOn(Reflect, 'getMetadata').mockImplementation((key, target) => {
+        if (key === 'design:paramtypes') {
+          return [String, Number];
+        }
+        return undefined;
+      });
+
+      const metadata = getInjectMetadata(mockTarget);
+      expect(metadata).toBeDefined();
+      expect(metadata?.[0]).toBe(String);
+      expect(metadata?.[1]).toBe(Number);
+      
+      // 恢复原始实现
+      jest.restoreAllMocks();
+    });
+  });
 });

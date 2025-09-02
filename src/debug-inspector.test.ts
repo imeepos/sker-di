@@ -602,4 +602,146 @@ describe('调试检查器测试', () => {
       expect(health).toContain('健康状态检查');
     });
   });
+
+  describe('🔄 重构阶段：便捷函数测试', () => {
+    it('应该通过便捷函数搜索令牌', () => {
+      // 🔴 测试便捷函数 searchTokens
+      const { searchTokens } = require('./debug-inspector');
+      const result = searchTokens('test');
+      expect(typeof result).toBe('string');
+    });
+
+    it('应该通过便捷函数执行健康检查', () => {
+      // 🔴 测试便捷函数 healthCheck
+      const { healthCheck } = require('./debug-inspector');
+      const result = healthCheck();
+      expect(typeof result).toBe('string');
+      expect(result).toContain('健康状态检查');
+    });
+
+    it('应该通过便捷函数生成完整报告', () => {
+      // 🔴 测试便捷函数 generateReport
+      const { generateReport } = require('./debug-inspector');
+      const result = generateReport();
+      expect(typeof result).toBe('string');
+      expect(result).toContain('📋 依赖注入系统调试报告');
+    });
+  });
+
+  describe('边界情况和错误处理', () => {
+    it('应该处理空提供者列表的注入器', () => {
+      enableDevMode({ logToConsole: false });
+      injector = new EnvironmentInjector([]);
+      
+      const details = inspector.printInjectorDetails();
+      expect(details).toContain('注入器详情');
+    });
+
+    it('应该处理多值提供者的显示', () => {
+      enableDevMode({ logToConsole: false });
+      const MULTI_TOKEN = new InjectionToken<string[]>('MULTI_TOKEN');
+      
+      injector = new EnvironmentInjector([
+        { provide: MULTI_TOKEN, useValue: 'value1', multi: true },
+        { provide: MULTI_TOKEN, useValue: 'value2', multi: true }
+      ]);
+      
+      // 触发实例创建
+      injector.get(MULTI_TOKEN);
+      
+      const details = inspector.printInjectorDetails();
+      expect(details).toContain('[multi]');
+    });
+
+    it('应该处理搜索结果为空的情况', () => {
+      enableDevMode({ logToConsole: false });
+      const TOKEN = new InjectionToken<string>('SEARCH_TOKEN');
+      
+      injector = new EnvironmentInjector([
+        { provide: TOKEN, useValue: 'searchable' }
+      ]);
+      
+      const emptyResult = inspector.searchTokens('nonexistent');
+      expect(emptyResult).toContain('未找到');
+    });
+
+    it('应该处理特定注入器ID的详细信息查询', () => {
+      enableDevMode({ logToConsole: false });
+      const TOKEN = new InjectionToken<string>('SPECIFIC_TOKEN');
+      
+      injector = new EnvironmentInjector([
+        { provide: TOKEN, useValue: 'specific' }
+      ]);
+      
+      const injectorId = injector.getInjectorId();
+      const details = inspector.printInjectorDetails(injectorId);
+      expect(details).toContain('注入器详情');
+      
+      // 测试不存在的注入器ID
+      const notFoundDetails = inspector.printInjectorDetails('nonexistent-id');
+      expect(notFoundDetails).toContain('未找到注入器');
+    });
+
+    it('应该处理子注入器的层次结构显示', () => {
+      enableDevMode({ logToConsole: false });
+      
+      const parentInjector = new EnvironmentInjector([
+        { provide: 'parent', useValue: 'parent-value' }
+      ]);
+      
+      const childInjector = new EnvironmentInjector([
+        { provide: 'child', useValue: 'child-value' }
+      ], parentInjector);
+      
+      const hierarchy = inspector.printInjectorHierarchy();
+      expect(hierarchy).toContain('依赖注入器层次结构');
+      
+      // 清理
+      childInjector.destroy();
+      parentInjector.destroy();
+    });
+
+    it('应该处理已销毁注入器的显示', () => {
+      enableDevMode({ logToConsole: false });
+      
+      injector = new EnvironmentInjector([
+        { provide: 'test', useValue: 'test-value' }
+      ]);
+      
+      injector.destroy();
+      
+      const hierarchy = inspector.printInjectorHierarchy();
+      expect(hierarchy).toContain('[已销毁]');
+    });
+
+    it('应该处理性能统计的边界情况', () => {
+      enableDevMode({ 
+        logToConsole: false,
+        collectMetrics: true 
+      });
+      
+      // 不执行任何注入操作，测试空统计
+      const stats = inspector.printPerformanceStats();
+      expect(stats).toContain('性能统计');
+      expect(stats).toMatch(/总注入次数: \d+/);
+    });
+
+    it('应该处理依赖关系图的空状态', () => {
+      enableDevMode({ logToConsole: false });
+      
+      const graph = inspector.printDependencyGraph();
+      expect(graph).toContain('没有记录到依赖关系');
+    });
+
+    it('应该处理导出数据的JSON格式', () => {
+      enableDevMode({ logToConsole: false });
+      
+      const exportData = inspector.exportData();
+      expect(typeof exportData).toBe('string');
+      expect(() => JSON.parse(exportData)).not.toThrow();
+      
+      const parsedData = JSON.parse(exportData);
+      expect(parsedData).toHaveProperty('timestamp');
+    });
+  });
 });

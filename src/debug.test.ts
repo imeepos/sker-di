@@ -1170,4 +1170,48 @@ describe('🔴 红阶段：未覆盖方法测试', () => {
     // formatEvent的default分支不包含时间戳，只验证格式
     expect(formattedMessage).toBe('unknown-event-type: TestToken');
   });
+
+  it('应该正确处理Trace级别的日志输出', () => {
+    // 🔴 测试console.trace分支
+    const traceSpy = jest.spyOn(console, 'trace').mockImplementation();
+    
+    const diDebugger = getDebugger();
+    diDebugger.enableDevMode({
+      logToConsole: true,
+      level: DebugLevel.Trace
+    });
+
+    // 直接调用私有方法logToConsole来测试Trace级别
+    const logToConsole = diDebugger['logToConsole'].bind(diDebugger);
+    const event: DebugEvent = {
+      type: DebugEventType.DependencyRequested,
+      timestamp: Date.now(),
+      injectorId: 'test-injector',
+      tokenName: 'TestToken'
+    };
+
+    // 模拟getEventLevel返回Trace级别
+    const originalGetEventLevel = diDebugger['getEventLevel'];
+    diDebugger['getEventLevel'] = () => DebugLevel.Trace;
+    
+    logToConsole(event);
+    
+    expect(traceSpy).toHaveBeenCalled();
+    
+    // 恢复原方法
+    diDebugger['getEventLevel'] = originalGetEventLevel;
+    traceSpy.mockRestore();
+  });
+
+  it('应该正确处理未知事件类型的级别获取', () => {
+    // 🔴 测试getEventLevel的default分支
+    const diDebugger = getDebugger();
+    const getEventLevel = diDebugger['getEventLevel'].bind(diDebugger);
+    
+    // 测试未知事件类型
+    const unknownEventType = 'unknown-type' as any;
+    const level = getEventLevel(unknownEventType);
+    
+    expect(level).toBe(DebugLevel.Debug);
+  });
 });

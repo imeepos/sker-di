@@ -120,6 +120,18 @@ export class LazyManager {
   }
 
   /**
+   * 注册通用延迟提供者（用于测试）
+   */
+  registerLazyProvider<T>(token: InjectionTokenType<T>, factory: () => T, isMulti: boolean = false): void {
+    const existing = this.lazyItems.get(token) || [];
+    this.lazyItems.set(token, [...existing, {
+      factory,
+      initialized: false,
+      isMulti
+    }]);
+  }
+
+  /**
    * 清理所有延迟项
    */
   clear(): void {

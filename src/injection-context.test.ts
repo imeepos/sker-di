@@ -183,4 +183,30 @@ describe('注入上下文管理', () => {
       expect(result).toBe('value1-factory'); // ❌ 工厂函数中的上下文未实现
     });
   });
+
+  describe('InjectionContextStack 边界情况', () => {
+    it('应该在空栈时返回null', () => {
+      // 🔴 测试空上下文时返回null
+      const result = getCurrentInjectionContext();
+      expect(result).toBeNull();
+    });
+
+    it('应该正确处理栈的推入和弹出', () => {
+      // 🔴 测试runInInjectionContext的上下文管理
+      const injector = EnvironmentInjector.createWithAutoProviders([]);
+      
+      // 初始状态应该为null
+      expect(getCurrentInjectionContext()).toBeNull();
+      
+      // 在上下文中执行
+      const result = runInInjectionContext(injector, () => {
+        expect(getCurrentInjectionContext()).toBe(injector);
+        return 'test-result';
+      });
+      
+      // 执行后上下文应该恢复
+      expect(result).toBe('test-result');
+      expect(getCurrentInjectionContext()).toBeNull();
+    });
+  });
 });
