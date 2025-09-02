@@ -34,7 +34,7 @@ export {
   hasInjectMetadata 
 } from './inject';
 export { InjectOptions } from './inject-options';
-export { OnDestroy } from './lifecycle';
+export { OnDestroy, isOnDestroy } from './lifecycle';
 export { runInInjectionContext, getCurrentInjectionContext } from './injection-context';
 export { forwardRef, ForwardRef, isForwardRef, resolveForwardRef } from './forward-ref';
 

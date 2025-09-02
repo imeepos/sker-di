@@ -4,7 +4,7 @@ import { Provider } from './provider';
 import { getInjectableMetadata } from './injectable';
 import { getInjectMetadata, getInjectOptionsMetadata } from './inject';
 import { InjectOptions } from './inject-options';
-import { OnDestroy } from './lifecycle';
+import { isOnDestroy, OnDestroy } from './lifecycle';
 import { LazyManager } from './lazy-manager';
 import { resolveForwardRefCached, resolveForwardRefsInDeps, isForwardRef } from './forward-ref';
 import { 
@@ -282,7 +282,7 @@ export class EnvironmentInjector extends Injector {
         instance: instance,
         metadata: {
           hasDependencies: false,
-          hasOnDestroy: typeof (instance as any).ngOnDestroy === 'function'
+          hasOnDestroy: isOnDestroy(instance)
         }
       });
 
@@ -312,7 +312,7 @@ export class EnvironmentInjector extends Injector {
       metadata: {
         hasDependencies: true,
         dependencyCount: dependencies.length,
-        hasOnDestroy: typeof (instance as any).ngOnDestroy === 'function'
+        hasOnDestroy: isOnDestroy(instance)
       }
     });
 
@@ -520,8 +520,8 @@ export class EnvironmentInjector extends Injector {
   private destroyInstance(instance: any): void {
     try {
       // 检查是否实现了 OnDestroy 接口
-      if (instance && typeof (instance as any).ngOnDestroy === 'function') {
-        (instance as any).ngOnDestroy();
+      if (isOnDestroy(instance)) {
+        instance.ngOnDestroy();
       }
     } catch (error) {
       // 吞没销毁过程中的错误，不影响其他实例的销毁
@@ -663,7 +663,7 @@ export class EnvironmentInjector extends Injector {
         instanceType: instance?.constructor?.name || 'unknown',
         createdAt: Date.now(), // 简化处理，实际可以记录具体创建时间
         isLazy: false, // 缓存中的实例都不是延迟的
-        hasOnDestroy: typeof instance?.ngOnDestroy === 'function'
+        hasOnDestroy: isOnDestroy(instance)
       });
     }
 
@@ -676,7 +676,7 @@ export class EnvironmentInjector extends Injector {
         instanceType: instance?.constructor?.name || 'unknown',
         createdAt: Date.now(),
         isLazy: true,
-        hasOnDestroy: typeof instance?.ngOnDestroy === 'function'
+        hasOnDestroy: isOnDestroy(instance)
       });
     }
 
