@@ -250,7 +250,7 @@ sker-di/
 #### 安装依赖
 ```bash
 # 克隆项目
-git clone <repository-url>
+git clone https://github.com/imeepos/sker-di.git
 cd sker-di
 
 # 安装依赖
