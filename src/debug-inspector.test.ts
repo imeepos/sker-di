@@ -3,6 +3,8 @@ import { enableDevMode, getDebugger } from './debug';
 import { EnvironmentInjector } from './environment-injector';
 import { Injectable } from './injectable';
 import { InjectionToken } from './injection-token';
+import { forwardRef } from './forward-ref';
+import { Inject } from './inject';
 
 describe('调试检查器测试', () => {
   let inspector: DIInspector;
@@ -201,12 +203,12 @@ describe('调试检查器测试', () => {
       // 创建循环依赖来触发警告
       @Injectable()
       class ServiceA {
-        constructor(private serviceB: ServiceB) {}
+        constructor(@Inject(forwardRef(() => ServiceB)) private serviceB: any) {}
       }
 
       @Injectable()
       class ServiceB {
-        constructor(private serviceA: ServiceA) {}
+        constructor(@Inject(forwardRef(() => ServiceA)) private serviceA: any) {}
       }
 
       injector = new EnvironmentInjector([

@@ -2,6 +2,8 @@ import { DIDebugger, getDebugger, enableDevMode, DebugLevel, DebugEventType } fr
 import { EnvironmentInjector } from './environment-injector';
 import { Injectable } from './injectable';
 import { InjectionToken } from './injection-token';
+import { forwardRef } from './forward-ref';
+import { Inject } from './inject';
 
 describe('调试支持测试', () => {
   let diDebugger: DIDebugger;
@@ -194,12 +196,12 @@ describe('调试支持测试', () => {
       // 🟢 最小实现：循环依赖检测记录事件
       @Injectable()
       class ServiceA {
-        constructor(private serviceB: ServiceB) {}
+        constructor(@Inject(forwardRef(() => ServiceB)) private serviceB: any) {}
       }
 
       @Injectable()
       class ServiceB {
-        constructor(private serviceA: ServiceA) {}
+        constructor(@Inject(forwardRef(() => ServiceA)) private serviceA: any) {}
       }
 
       diDebugger.enableDevMode({ logToConsole: false });
@@ -333,15 +335,15 @@ describe('调试支持测试', () => {
 
     it('应该构建依赖关系图', () => {
       @Injectable()
-      class ParentService {
-        constructor(private child: ChildService) {}
-      }
-
-      @Injectable()
       class ChildService {
         getValue(): string {
           return 'child-value';
         }
+      }
+
+      @Injectable()
+      class ParentService {
+        constructor(private child: ChildService) {}
       }
 
       diDebugger.enableDevMode({ logToConsole: false });

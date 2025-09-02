@@ -129,6 +129,8 @@ export class EnvironmentInjector extends Injector {
         // 非多值提供者才缓存实例
         if (!this.isMultiProvider(tokenProviders)) {
           this.instances.set(resolvedToken, result);
+          // 更新调试信息
+          this.updateDebugInfo();
         }
       } else {
         // 尝试自动解析 providedIn 服务
@@ -146,6 +148,8 @@ export class EnvironmentInjector extends Injector {
           this.providers.set(resolvedToken, [autoProvider]);
           result = this.createInstance(resolvedToken, [autoProvider]);
           this.instances.set(resolvedToken, result);
+          // 更新调试信息
+          this.updateDebugInfo();
         } else {
           // 委托给父注入器
           result = this.parent!.get(resolvedToken);
