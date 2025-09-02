@@ -8,3 +8,7 @@ export interface OnDestroy {
    */
   ngOnDestroy(): void;
 }
+
+export function isOnDestroy(obj: any): obj is OnDestroy {
+  return obj != null && typeof obj.ngOnDestroy === 'function';
+}

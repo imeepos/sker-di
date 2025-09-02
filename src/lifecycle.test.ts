@@ -1,6 +1,6 @@
 import { EnvironmentInjector } from './environment-injector';
 import { Injectable } from './injectable';
-import { OnDestroy } from './lifecycle';
+import { OnDestroy, isOnDestroy } from './lifecycle';
 
 describe('生命周期管理', () => {
   it('应该在服务销毁时调用 ngOnDestroy', () => {
@@ -177,5 +177,73 @@ describe('生命周期管理', () => {
 
     injector.destroy();
     expect(destroySpy).toHaveBeenCalledTimes(1);
+  });
+
+  describe('isOnDestroy 函数', () => {
+    it('应该正确识别实现了 OnDestroy 接口的对象', () => {
+      class ServiceWithDestroy implements OnDestroy {
+        ngOnDestroy(): void {
+          // 清理逻辑
+        }
+      }
+
+      const service = new ServiceWithDestroy();
+      expect(isOnDestroy(service)).toBe(true);
+    });
+
+    it('应该正确识别没有实现 OnDestroy 接口的对象', () => {
+      class ServiceWithoutDestroy {
+        value = 'test';
+      }
+
+      const service = new ServiceWithoutDestroy();
+      expect(isOnDestroy(service)).toBe(false);
+    });
+
+    it('应该正确处理有 ngOnDestroy 属性但不是函数的对象', () => {
+      const objectWithNonFunctionDestroy = {
+        ngOnDestroy: 'not a function'
+      };
+
+      expect(isOnDestroy(objectWithNonFunctionDestroy)).toBe(false);
+    });
+
+    it('应该正确处理 null 和 undefined', () => {
+      expect(isOnDestroy(null)).toBe(false);
+      expect(isOnDestroy(undefined)).toBe(false);
+    });
+
+    it('应该正确处理空对象', () => {
+      const emptyObject = {};
+      expect(isOnDestroy(emptyObject)).toBe(false);
+    });
+
+    it('应该正确识别动态添加 ngOnDestroy 方法的对象', () => {
+      const dynamicObject: any = {
+        value: 'test'
+      };
+
+      // 动态添加 ngOnDestroy 方法
+      dynamicObject.ngOnDestroy = function() {
+        console.log('销毁');
+      };
+
+      expect(isOnDestroy(dynamicObject)).toBe(true);
+    });
+
+    it('应该正确处理原型链上有 ngOnDestroy 方法的对象', () => {
+      class BaseService {
+        ngOnDestroy(): void {
+          // 基类销毁逻辑
+        }
+      }
+
+      class DerivedService extends BaseService {
+        value = 'derived';
+      }
+
+      const service = new DerivedService();
+      expect(isOnDestroy(service)).toBe(true);
+    });
   });
 });
