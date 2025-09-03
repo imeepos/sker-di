@@ -7,15 +7,17 @@
 ### 🏆 质量保证
 
 - **🧪 高测试覆盖率** - 语句覆盖率 98.03%，分支覆盖率 93.28%
-- **✅ 全面测试** - 530个测试用例，覆盖核心功能和边界情况
+- **✅ 全面测试** - 530+个测试用例，覆盖核心功能和边界情况
 - **🔍 深度验证** - TDD开发模式，先写测试再写实现
 - **⚡ 快速反馈** - 16秒内完成全部测试，支持监听模式
 - **🛡️ 类型安全** - 100% TypeScript，编译期错误检查
+- **🔒 架构安全** - 强制的注入器层次结构和单例保护
 - **📊 持续监控** - 自动化测试和覆盖率报告
 
 ### ✨ 核心特性
 - 🔒 **类型安全** - 完整的 TypeScript 类型支持，编译期错误检查
-- 🏗️ **层次化注入器** - 支持父子关系的注入器结构
+- 🏗️ **严格层次架构** - Root → Platform → Application → Feature 四层结构
+- 🔒 **单例保护** - Root 和 Platform 注入器全局单例，防止架构混乱
 - 🎯 **灵活的令牌系统** - 支持类构造函数、InjectionToken、字符串和符号令牌
 - ⚙️ **多种提供者** - ValueProvider、ClassProvider、FactoryProvider 等
 - 🔧 **注入选项控制** - optional、skipSelf、self、host 等选项
@@ -104,6 +106,47 @@ const injector = new EnvironmentInjector([
 // 获取服务实例
 const apiService = injector.get(ApiService);
 console.log(apiService.fetchUser());
+```
+
+### 🏗️ 企业级架构：多层注入器
+
+```typescript
+import {
+  createRootInjector,
+  createPlatformInjector,
+  createApplicationInjector,
+  createFeatureInjector,
+  Injectable
+} from '@sker/di';
+
+// 定义不同作用域的服务
+@Injectable({ providedIn: 'platform' })
+class LoggerService {
+  log(message: string) { console.log(`[LOG] ${message}`); }
+}
+
+@Injectable({ providedIn: 'application' })
+class AuthService {
+  isAuthenticated() { return true; }
+}
+
+@Injectable({ providedIn: 'feature' })
+class UserManagementService {
+  getUsers() { return ['user1', 'user2']; }
+}
+
+// 创建严格的层次结构（强制顺序）
+const rootInjector = createRootInjector();           // 1. 根注入器（全局单例）
+const platformInjector = createPlatformInjector();   // 2. 平台注入器（全局单例）
+const webApp = createApplicationInjector();          // 3. 应用注入器（多实例）
+const userFeature = createFeatureInjector([], webApp); // 4. 功能注入器（多实例）
+
+// 从任何层级获取服务
+const logger = userFeature.get(LoggerService);        // 从平台层继承
+const auth = userFeature.get(AuthService);            // 从应用层继承
+const userMgmt = userFeature.get(UserManagementService); // 功能层服务
+
+logger.log('Application started!');
 ```
 
 ### 使用 InjectionToken

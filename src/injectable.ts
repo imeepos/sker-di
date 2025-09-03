@@ -1,14 +1,22 @@
 /**
+ * 注入器作用域类型
+ */
+export type InjectorScope = 'root' | 'platform' | 'application' | 'feature' | 'auto';
+
+/**
  * Injectable 配置选项
  */
 export interface InjectableOptions {
   /**
    * 提供者作用域，决定在哪个注入器中自动注册
-   * - 'root': 在根注入器中注册
-   * - 'platform': 在平台注入器中注册  
+   * - 'auto': 在任何注入器中都可以自动注册（默认，最灵活）
+   * - 'root': 在根注入器中注册（基础服务）
+   * - 'platform': 在平台注入器中注册（跨应用共享）
+   * - 'application': 在应用注入器中注册（应用级单例）
+   * - 'feature': 在功能模块注入器中注册（模块级单例）
    * - null: 不自动注册，需要手动配置
    */
-  providedIn?: 'root' | 'platform' | null;
+  providedIn?: InjectorScope | null;
 
   /**
    * 工厂函数，用于创建实例
