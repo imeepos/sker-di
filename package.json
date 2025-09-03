@@ -1,6 +1,6 @@
 {
   "name": "@sker/di",
-  "version": "1.0.4-alpha.0",
+  "version": "1.0.4",
   "description": "现代化的 TypeScript 依赖注入(DI)系统，借鉴 Angular DI 核心设计理念",
   "main": "dist/index.cjs",
   "module": "dist/index.mjs",
