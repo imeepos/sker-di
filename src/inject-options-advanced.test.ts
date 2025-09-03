@@ -196,41 +196,37 @@ describe('高级注入选项', () => {
     it('self 和 skipSelf 不能同时使用', () => {
       const TOKEN = new InjectionToken<string>('TEST_TOKEN');
 
-      @Injectable({ providedIn: 'root' })
-      class TestService {
-        constructor(
-          @Inject(TOKEN, { self: true, skipSelf: true }) public value: string
-        ) {}
-      }
-
-      const injector = EnvironmentInjector.createWithAutoProviders([
-        { provide: TOKEN, useValue: 'test-value' }
-      ]);
-
-      expect(() => injector.get(TestService))
-        .toThrow('InjectOptions: self 和 skipSelf 选项不能同时使用'); // ✅ 已实现验证
+      // 现在冲突检测在装饰器应用时就会抛出错误
+      expect(() => {
+        @Injectable({ providedIn: 'root' })
+        class TestService {
+          constructor(
+            @Inject(TOKEN, { self: true, skipSelf: true }) public value: string
+          ) {}
+        }
+      }).toThrow(/选项冲突/);
     });
 
     it('host 不能与 self 同时使用', () => {
       const TOKEN = new InjectionToken<string>('TEST_TOKEN');
 
-      @Injectable({ providedIn: 'root' })
-      class TestService {
-        constructor(
-          @Inject(TOKEN, { host: true, self: true }) public value: string
-        ) {}
-      }
-
-      const injector = EnvironmentInjector.createWithAutoProviders([
-        { provide: TOKEN, useValue: 'test-value' }
-      ]);
-
-      expect(() => injector.get(TestService))
-        .toThrow('InjectOptions: host 选项不能与 self 或 skipSelf 同时使用'); // ✅ 已实现验证
+      // 现在冲突检测在装饰器应用时就会抛出错误
+      expect(() => {
+        @Injectable({ providedIn: 'root' })
+        class TestService {
+          constructor(
+            @Inject(TOKEN, { host: true, self: true }) public value: string
+          ) {}
+        }
+      }).toThrow(/选项冲突/);
     });
 
     it('host 不能与 skipSelf 同时使用', () => {
       const TOKEN = new InjectionToken<string>('TEST_TOKEN');
+
+      // host + skipSelf 组合会给出警告但不会抛出错误
+      // 这个组合在技术上是可行的，但不推荐
+      const warningSpy = jest.spyOn(console, 'warn').mockImplementation();
 
       @Injectable({ providedIn: 'root' })
       class TestService {
@@ -239,12 +235,11 @@ describe('高级注入选项', () => {
         ) {}
       }
 
-      const injector = EnvironmentInjector.createWithAutoProviders([
-        { provide: TOKEN, useValue: 'test-value' }
-      ]);
+      expect(warningSpy).toHaveBeenCalledWith(
+        expect.stringContaining('skipSelf" 和 "host"')
+      );
 
-      expect(() => injector.get(TestService))
-        .toThrow('InjectOptions: host 选项不能与 self 或 skipSelf 同时使用'); // ✅ 已实现验证
+      warningSpy.mockRestore();
     });
   });
 });

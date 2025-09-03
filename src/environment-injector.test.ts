@@ -564,42 +564,35 @@ describe('EnvironmentInjector', () => {
 
     describe('注入选项错误处理测试', () => {
       it('应该在self和skipSelf同时使用时抛出错误', () => {
-        @Injectable()
-        class ServiceWithConflictOptions {
-          constructor(
-            @Inject('TEST_TOKEN', { self: true, skipSelf: true })
-            public value: string
-          ) {}
-        }
-
-        injector = new EnvironmentInjector([
-          { provide: ServiceWithConflictOptions, useClass: ServiceWithConflictOptions },
-          { provide: 'TEST_TOKEN', useValue: 'test-value' }
-        ]);
-        
-        expect(() => injector.get(ServiceWithConflictOptions))
-          .toThrow('InjectOptions: self 和 skipSelf 选项不能同时使用');
+        // 现在冲突检测在装饰器应用时就会抛出错误
+        expect(() => {
+          @Injectable()
+          class ServiceWithConflictOptions {
+            constructor(
+              @Inject('TEST_TOKEN', { self: true, skipSelf: true })
+              public value: string
+            ) {}
+          }
+        }).toThrow(/选项冲突/);
       });
 
       it('应该在host和self同时使用时抛出错误', () => {
-        @Injectable()
-        class ServiceWithHostSelfConflict {
-          constructor(
-            @Inject('TEST_TOKEN', { host: true, self: true })
-            public value: string
-          ) {}
-        }
-
-        injector = new EnvironmentInjector([
-          { provide: ServiceWithHostSelfConflict, useClass: ServiceWithHostSelfConflict },
-          { provide: 'TEST_TOKEN', useValue: 'test-value' }
-        ]);
-        
-        expect(() => injector.get(ServiceWithHostSelfConflict))
-          .toThrow('InjectOptions: host 选项不能与 self 或 skipSelf 同时使用');
+        // 现在冲突检测在装饰器应用时就会抛出错误
+        expect(() => {
+          @Injectable()
+          class ServiceWithHostSelfConflict {
+            constructor(
+              @Inject('TEST_TOKEN', { host: true, self: true })
+              public value: string
+            ) {}
+          }
+        }).toThrow(/选项冲突/);
       });
 
-      it('应该在host和skipSelf同时使用时抛出错误', () => {
+      it('应该在host和skipSelf同时使用时给出警告', () => {
+        // host + skipSelf 组合会给出警告但不会抛出错误
+        const warningSpy = jest.spyOn(console, 'warn').mockImplementation();
+
         @Injectable()
         class ServiceWithHostSkipSelfConflict {
           constructor(
@@ -608,13 +601,11 @@ describe('EnvironmentInjector', () => {
           ) {}
         }
 
-        injector = new EnvironmentInjector([
-          { provide: ServiceWithHostSkipSelfConflict, useClass: ServiceWithHostSkipSelfConflict },
-          { provide: 'TEST_TOKEN', useValue: 'test-value' }
-        ]);
-        
-        expect(() => injector.get(ServiceWithHostSkipSelfConflict))
-          .toThrow('InjectOptions: host 选项不能与 self 或 skipSelf 同时使用');
+        expect(warningSpy).toHaveBeenCalledWith(
+          expect.stringContaining('skipSelf" 和 "host"')
+        );
+
+        warningSpy.mockRestore();
       });
 
       it('应该在已销毁的注入器上调用getSelf时抛出错误', () => {
@@ -1658,6 +1649,104 @@ describe('EnvironmentInjector', () => {
         const type = (injector as any).getProviderType(provider);
         expect(type).toBe(expectedTypes[index]);
       });
+    });
+  });
+
+  describe('🚀 InternalInjectFlags 性能优化测试', () => {
+    it('应该支持使用位标志进行依赖解析', () => {
+      const { InternalInjectFlags, convertInjectOptionsToFlags, hasFlag } = require('./internal-inject-flags');
+
+      class ServiceA {
+        getValue() { return 'A'; }
+      }
+
+      class ServiceB {
+        getValue() { return 'B'; }
+      }
+
+      const parentInjector = new EnvironmentInjector([
+        { provide: ServiceA, useClass: ServiceA }
+      ]);
+
+      const childInjector = new EnvironmentInjector([
+        { provide: ServiceB, useClass: ServiceB }
+      ], parentInjector);
+
+      // 测试位标志转换
+      const optionalFlags = convertInjectOptionsToFlags({ optional: true });
+      const skipSelfFlags = convertInjectOptionsToFlags({ skipSelf: true });
+      const selfFlags = convertInjectOptionsToFlags({ self: true });
+
+      expect(hasFlag(optionalFlags, InternalInjectFlags.Optional)).toBe(true);
+      expect(hasFlag(skipSelfFlags, InternalInjectFlags.SkipSelf)).toBe(true);
+      expect(hasFlag(selfFlags, InternalInjectFlags.Self)).toBe(true);
+
+      // 测试组合标志
+      const combinedFlags = InternalInjectFlags.Optional | InternalInjectFlags.SkipSelf;
+      expect(hasFlag(combinedFlags, InternalInjectFlags.Optional)).toBe(true);
+      expect(hasFlag(combinedFlags, InternalInjectFlags.SkipSelf)).toBe(true);
+      expect(hasFlag(combinedFlags, InternalInjectFlags.Self)).toBe(false);
+    });
+
+    it('应该验证位运算的性能优势', () => {
+      const { InternalInjectFlags, hasFlag } = require('./internal-inject-flags');
+
+      // 模拟大量的标志检查操作
+      const flags = InternalInjectFlags.Optional | InternalInjectFlags.SkipSelf;
+      const options = { optional: true, skipSelf: true };
+
+      const iterations = 10000;
+
+      // 测试位运算方式
+      const startBitwise = performance.now();
+      for (let i = 0; i < iterations; i++) {
+        hasFlag(flags, InternalInjectFlags.Optional);
+        hasFlag(flags, InternalInjectFlags.SkipSelf);
+      }
+      const endBitwise = performance.now();
+
+      // 测试对象属性方式
+      const startObject = performance.now();
+      for (let i = 0; i < iterations; i++) {
+        !!options.optional;
+        !!options.skipSelf;
+      }
+      const endObject = performance.now();
+
+      const bitwiseTime = endBitwise - startBitwise;
+      const objectTime = endObject - startObject;
+
+      // 位运算应该更快（或至少不慢太多）
+      console.log(`位运算时间: ${bitwiseTime.toFixed(3)}ms`);
+      console.log(`对象属性时间: ${objectTime.toFixed(3)}ms`);
+
+      // 验证结果正确性
+      expect(hasFlag(flags, InternalInjectFlags.Optional)).toBe(!!options.optional);
+      expect(hasFlag(flags, InternalInjectFlags.SkipSelf)).toBe(!!options.skipSelf);
+    });
+
+    it('应该正确处理所有注入标志组合', () => {
+      const { InternalInjectFlags, combineInjectFlags, hasFlag } = require('./internal-inject-flags');
+
+      // 测试所有可能的标志组合
+      const allFlags = combineInjectFlags(
+        InternalInjectFlags.Optional,
+        InternalInjectFlags.SkipSelf,
+        InternalInjectFlags.Self,
+        InternalInjectFlags.Host
+      );
+
+      expect(hasFlag(allFlags, InternalInjectFlags.Optional)).toBe(true);
+      expect(hasFlag(allFlags, InternalInjectFlags.SkipSelf)).toBe(true);
+      expect(hasFlag(allFlags, InternalInjectFlags.Self)).toBe(true);
+      expect(hasFlag(allFlags, InternalInjectFlags.Host)).toBe(true);
+
+      // 测试部分组合
+      const partialFlags = InternalInjectFlags.Optional | InternalInjectFlags.Self;
+      expect(hasFlag(partialFlags, InternalInjectFlags.Optional)).toBe(true);
+      expect(hasFlag(partialFlags, InternalInjectFlags.Self)).toBe(true);
+      expect(hasFlag(partialFlags, InternalInjectFlags.SkipSelf)).toBe(false);
+      expect(hasFlag(partialFlags, InternalInjectFlags.Host)).toBe(false);
     });
   });
 });

@@ -32,7 +32,39 @@ pnpm add @sker/di
 
 ## 快速开始
 
-### 基本使用
+### 🚀 推荐方式：使用 createInjector
+
+```typescript
+import { Injectable, createInjector, Inject } from '@sker/di';
+
+// 定义可注入的服务
+@Injectable({ providedIn: 'root' })
+class UserService {
+  getUser() {
+    return { name: 'John', age: 30 };
+  }
+}
+
+@Injectable({ providedIn: 'root' })
+class ApiService {
+  constructor(private userService: UserService) {}
+
+  async fetchUser() {
+    return this.userService.getUser();
+  }
+}
+
+// 🚀 使用便捷函数创建注入器，自动解析 providedIn 服务
+const injector = createInjector([
+  // 只需要配置一些令牌，服务会自动解析
+]);
+
+// 获取服务实例
+const apiService = injector.get(ApiService);
+console.log(apiService.fetchUser());
+```
+
+### 传统方式：使用 EnvironmentInjector
 
 ```typescript
 import { Injectable, EnvironmentInjector, Inject } from '@sker/di';
@@ -48,7 +80,7 @@ class UserService {
 @Injectable()
 class ApiService {
   constructor(private userService: UserService) {}
-  
+
   async fetchUser() {
     return this.userService.getUser();
   }
@@ -116,10 +148,57 @@ const injector = new EnvironmentInjector([
 
 ## API 文档
 
+### 核心函数
+
+#### createInjector() 🚀 推荐
+便捷的注入器创建函数，是 `EnvironmentInjector.createWithAutoProviders()` 的简化版本。
+
+```typescript
+function createInjector(providers: Provider[], parent?: Injector): EnvironmentInjector
+```
+
+**特性**:
+- ✅ **自动解析** - 支持 `@Injectable({ providedIn: 'root' })` 的自动注册
+- ✅ **简洁API** - 直接函数调用，无需使用静态方法
+- ✅ **层次化支持** - 支持父子注入器关系
+- ✅ **完全兼容** - 与 `EnvironmentInjector` 功能完全一致
+- ✅ **类型安全** - 完整的 TypeScript 类型支持
+
+**使用示例**:
+```typescript
+import { createInjector, Injectable, InjectionToken } from '@sker/di';
+
+const API_URL = new InjectionToken<string>('API_URL');
+
+@Injectable({ providedIn: 'root' })
+class UserService {
+  getUsers() { return ['user1', 'user2']; }
+}
+
+// 创建注入器，UserService 会自动解析
+const injector = createInjector([
+  { provide: API_URL, useValue: 'https://api.example.com' }
+]);
+
+const userService = injector.get(UserService); // 自动解析，无需手动注册
+```
+
 ### 核心类
 
 #### EnvironmentInjector
-主要的注入器实现，支持层次化结构和提供者注册。
+主要的注入器实现，支持层次化结构和提供者注册。经过重构优化，代码更加简洁高效。
+
+#### EnvironmentInjectorUtils 🆕
+环境注入器的工具类，提供通用的辅助方法：
+- `getTokenName()` - 获取令牌的可读名称
+- `getTokenType()` - 获取令牌类型
+- `getProviderType()` - 获取提供者类型
+- `isMultiProvider()` - 检查是否为多值提供者
+- `validateInjectOptions()` - 验证注入选项
+- `generateCircularDependencyError()` - 生成循环依赖错误
+- `generateInjectorId()` - 生成唯一注入器ID
+- `generateProvidersDebugInfo()` - 生成提供者调试信息
+- `generateInstancesDebugInfo()` - 生成实例调试信息
 
 #### InjectionToken<T>
 类型安全的注入令牌，用于非类类型的依赖注入。
@@ -127,7 +206,7 @@ const injector = new EnvironmentInjector([
 #### Provider
 提供者接口，支持多种提供方式：
 - `ValueProvider` - 直接提供值
-- `ClassProvider` - 提供类实例  
+- `ClassProvider` - 提供类实例
 - `FactoryProvider` - 通过工厂函数创建
 - `ExistingProvider` - 别名提供者
 
@@ -215,29 +294,30 @@ npm run build
 
 ```
 sker-di/
-├── src/                          # 源代码目录
-│   ├── index.ts                  # 主入口文件
-│   ├── injector.ts              # 核心注入器实现
-│   ├── environment-injector.ts   # 环境注入器
-│   ├── injection-token.ts        # 注入令牌
-│   ├── provider.ts               # 提供者类型定义
-│   ├── injectable.ts             # @Injectable 装饰器
-│   ├── inject.ts                 # @Inject 装饰器
-│   ├── inject-options.ts         # 注入选项
-│   ├── lifecycle.ts              # 生命周期管理
-│   ├── forward-ref.ts            # 前向引用
-│   ├── debug.ts                  # 调试工具
-│   ├── debug-inspector.ts        # 调试检查器
-│   ├── lazy-manager.ts           # 延迟加载管理
-│   ├── null-injector.ts          # 空注入器
-│   ├── injection-context.ts      # 注入上下文
-│   └── *.test.ts                 # 测试文件
-├── dist/                         # 构建输出目录
-├── jest.config.js                # Jest 测试配置
-├── tsconfig.json                 # TypeScript 配置
-├── tsup.config.ts                # 构建配置
-├── package.json                  # 项目配置
-└── README.md                     # 项目文档
+├── src/                              # 源代码目录
+│   ├── index.ts                      # 主入口文件
+│   ├── injector.ts                   # 核心注入器实现
+│   ├── environment-injector.ts       # 环境注入器 (主要实现)
+│   ├── environment-injector-utils.ts # 🆕 环境注入器工具类
+│   ├── injection-token.ts            # 注入令牌
+│   ├── provider.ts                   # 提供者类型定义
+│   ├── injectable.ts                 # @Injectable 装饰器
+│   ├── inject.ts                     # @Inject 装饰器
+│   ├── inject-options.ts             # 注入选项
+│   ├── lifecycle.ts                  # 生命周期管理
+│   ├── forward-ref.ts                # 前向引用
+│   ├── debug.ts                      # 调试工具
+│   ├── debug-inspector.ts            # 调试检查器
+│   ├── lazy-manager.ts               # 延迟加载管理
+│   ├── null-injector.ts              # 空注入器
+│   ├── injection-context.ts          # 注入上下文
+│   └── *.test.ts                     # 测试文件
+├── dist/                             # 构建输出目录
+├── jest.config.js                    # Jest 测试配置
+├── tsconfig.json                     # TypeScript 配置
+├── tsup.config.ts                    # 构建配置
+├── package.json                      # 项目配置
+└── README.md                         # 项目文档
 ```
 
 ### 🛠️ 开发环境设置

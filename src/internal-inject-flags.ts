@@ -60,14 +60,18 @@ export function hasFlag(flags: InternalInjectFlags, targetFlag: InternalInjectFl
 
 /**
  * 将 InjectOptions 转换为内部标志位
- * 
+ *
  * @param options 注入选项对象
  * @returns 对应的内部标志位
+ * @throws {Error} 当选项组合冲突时抛出错误
  */
 export function convertInjectOptionsToFlags(options?: InjectOptions): InternalInjectFlags {
   if (!options) {
     return InternalInjectFlags.Default;
   }
+
+  // 🔍 检测冲突的选项组合
+  validateInjectOptionsConflicts(options);
 
   let flags = InternalInjectFlags.Default;
 
@@ -88,6 +92,56 @@ export function convertInjectOptionsToFlags(options?: InjectOptions): InternalIn
   }
 
   return flags;
+}
+
+/**
+ * 验证注入选项是否存在冲突
+ *
+ * @param options 注入选项对象
+ * @throws {Error} 当选项组合冲突时抛出错误
+ */
+export function validateInjectOptionsConflicts(options: InjectOptions): void {
+  const conflicts: Array<{ options: string[]; reason: string }> = [];
+
+  // self 和 skipSelf 冲突
+  if (options.self && options.skipSelf) {
+    conflicts.push({
+      options: ['self', 'skipSelf'],
+      reason: '"self" 只在当前注入器查找，而 "skipSelf" 跳过当前注入器，两者互相矛盾'
+    });
+  }
+
+  // self 和 host 冲突
+  if (options.self && options.host) {
+    conflicts.push({
+      options: ['self', 'host'],
+      reason: '"self" 只在当前注入器查找，而 "host" 在宿主注入器查找，两者互相矛盾'
+    });
+  }
+
+  // skipSelf 和 host 的组合需要警告（虽然不是严格冲突，但可能不是预期行为）
+  if (options.skipSelf && options.host) {
+    // 这个组合在技术上是可能的，但通常不是预期的行为
+    // 暂时不抛出错误，但可以在调试模式下给出警告
+    if (typeof console !== 'undefined' && console.warn) {
+      console.warn(
+        'InjectOptions 警告: 同时使用 "skipSelf" 和 "host" 可能不是预期的行为。' +
+        '"skipSelf" 会被 "host" 的行为覆盖。'
+      );
+    }
+  }
+
+  // 如果有冲突，抛出详细的错误信息
+  if (conflicts.length > 0) {
+    const errorMessages = conflicts.map(conflict =>
+      `- ${conflict.options.join(' + ')}: ${conflict.reason}`
+    ).join('\n');
+
+    throw new Error(
+      `InjectOptions 选项冲突:\n${errorMessages}\n\n` +
+      '请检查注入选项的组合是否正确。'
+    );
+  }
 }
 
 /**

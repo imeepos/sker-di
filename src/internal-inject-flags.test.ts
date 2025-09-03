@@ -111,21 +111,37 @@ describe('InternalInjectFlags 位标志系统测试', () => {
       expect(flags).toBe(InternalInjectFlags.Optional | InternalInjectFlags.SkipSelf);
     });
 
-    it('应该正确转换所有选项', () => {
-      const options: InjectOptions = { 
-        optional: true, 
-        skipSelf: true,
+    it('应该正确转换兼容的选项组合', () => {
+      const options: InjectOptions = {
+        optional: true,
+        skipSelf: true
+      };
+      const flags = convertInjectOptionsToFlags(options);
+
+      expect(flags).toBe(
+        InternalInjectFlags.Optional |
+        InternalInjectFlags.SkipSelf
+      );
+    });
+
+    it('应该拒绝冲突的选项组合', () => {
+      const conflictOptions1: InjectOptions = {
+        self: true,
+        skipSelf: true
+      };
+
+      expect(() => {
+        convertInjectOptionsToFlags(conflictOptions1);
+      }).toThrow(/选项冲突/);
+
+      const conflictOptions2: InjectOptions = {
         self: true,
         host: true
       };
-      const flags = convertInjectOptionsToFlags(options);
-      
-      expect(flags).toBe(
-        InternalInjectFlags.Optional | 
-        InternalInjectFlags.SkipSelf | 
-        InternalInjectFlags.Self | 
-        InternalInjectFlags.Host
-      );
+
+      expect(() => {
+        convertInjectOptionsToFlags(conflictOptions2);
+      }).toThrow(/选项冲突/);
     });
 
     it('应该处理空选项', () => {
@@ -238,8 +254,8 @@ describe('InternalInjectFlags 位标志系统测试', () => {
       expect(convertedOptions).toEqual(originalOptions);
     });
 
-    it('所有选项组合都应该支持双向转换', () => {
-      const testCases: InjectOptions[] = [
+    it('所有有效选项组合都应该支持双向转换', () => {
+      const validTestCases: InjectOptions[] = [
         {},
         { optional: true },
         { skipSelf: true },
@@ -247,18 +263,34 @@ describe('InternalInjectFlags 位标志系统测试', () => {
         { host: true },
         { optional: true, skipSelf: true },
         { optional: true, self: true },
-        { optional: true, host: true },
-        { skipSelf: true, self: true },
-        { skipSelf: true, host: true },
-        { self: true, host: true },
-        { optional: true, skipSelf: true, self: true, host: true }
+        { optional: true, host: true }
+        // 注意：移除了冲突的组合
+        // { skipSelf: true, self: true }, // 冲突
+        // { self: true, host: true }, // 冲突
+        // { optional: true, skipSelf: true, self: true, host: true } // 包含冲突
       ];
 
-      testCases.forEach(originalOptions => {
+      validTestCases.forEach(originalOptions => {
         const flags = convertInjectOptionsToFlags(originalOptions);
         const convertedOptions = convertFlagsToInjectOptions(flags);
         
         expect(convertedOptions).toEqual(originalOptions);
+      });
+    });
+
+    it('应该拒绝冲突选项组合的双向转换', () => {
+      const conflictTestCases: InjectOptions[] = [
+        { skipSelf: true, self: true },
+        { self: true, host: true },
+        { optional: true, skipSelf: true, self: true },
+        { optional: true, self: true, host: true },
+        { optional: true, skipSelf: true, self: true, host: true }
+      ];
+
+      conflictTestCases.forEach(conflictOptions => {
+        expect(() => {
+          convertInjectOptionsToFlags(conflictOptions);
+        }).toThrow(/选项冲突/);
       });
     });
   });

@@ -4,6 +4,11 @@ import { Provider } from './provider';
 import { getInjectableMetadata } from './injectable';
 import { getInjectMetadata, getInjectOptionsMetadata } from './inject';
 import { InjectOptions } from './inject-options';
+import {
+  InternalInjectFlags,
+  convertInjectOptionsToFlags,
+  hasFlag
+} from './internal-inject-flags';
 import { isOnDestroy, OnDestroy } from './lifecycle';
 import { LazyManager } from './lazy-manager';
 import { resolveForwardRefCached, resolveForwardRefsInDeps, isForwardRef } from './forward-ref';
@@ -323,31 +328,54 @@ export class EnvironmentInjector extends Injector {
   /**
    * 根据注入选项解析依赖
    * 支持 optional, skipSelf, self, host 选项
+   * 🚀 使用位标志优化性能
    */
-  private resolveDependency<T>(token: InjectionTokenType<T>, options: InjectOptions): T {
-    // 验证互斥选项
-    EnvironmentInjectorUtils.validateInjectOptions(options);
+  private resolveDependency<T>(token: InjectionTokenType<T>, options: InjectOptions): T;
+
+  /**
+   * 根据内部标志位解析依赖 (性能优化版本)
+   * 🚀 直接使用位标志，避免对象属性检查和转换开销
+   */
+  private resolveDependency<T>(token: InjectionTokenType<T>, flags: InternalInjectFlags): T;
+
+  /**
+   * 实际的依赖解析实现
+   */
+  private resolveDependency<T>(token: InjectionTokenType<T>, optionsOrFlags: InjectOptions | InternalInjectFlags): T {
+    // 🚀 性能优化：统一处理为位标志
+    let flags: InternalInjectFlags;
+
+    if (typeof optionsOrFlags === 'number') {
+      // 已经是位标志，直接使用
+      flags = optionsOrFlags;
+    } else {
+      // 是选项对象，需要验证和转换
+      EnvironmentInjectorUtils.validateInjectOptions(optionsOrFlags);
+      flags = convertInjectOptionsToFlags(optionsOrFlags);
+    }
 
     try {
-      if (options.skipSelf) {
+      // 🚀 使用位运算代替对象属性检查，提高性能
+      if (hasFlag(flags, InternalInjectFlags.SkipSelf)) {
         // skipSelf: 跳过当前注入器，从父注入器开始查找
         return this.parent!.get(token);
       }
-      
-      if (options.self) {
+
+      if (hasFlag(flags, InternalInjectFlags.Self)) {
         // self: 只在当前注入器查找，不查找父注入器
         return this.getSelf(token);
       }
-      
-      if (options.host) {
+
+      if (hasFlag(flags, InternalInjectFlags.Host)) {
         // host: 在宿主注入器（根注入器）中查找
         return this.getFromHost(token);
       }
-      
+
       // 默认行为：正常的层次化查找
       return this.get(token);
     } catch (error) {
-      if (options.optional) {
+      // 🚀 使用位运算检查可选标志
+      if (hasFlag(flags, InternalInjectFlags.Optional)) {
         return null as any;
       }
       throw error;

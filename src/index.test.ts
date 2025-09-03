@@ -347,4 +347,82 @@ describe('PRD_v2.md 新功能导出测试', () => {
       injector.destroy();
     });
   });
+
+  describe('🚀 便捷工厂函数测试', () => {
+    it('应该正确导出createInjector函数', () => {
+      // 🔴 失败的测试：验证createInjector导出
+      expect(DI.createInjector).toBeDefined();
+      expect(typeof DI.createInjector).toBe('function');
+    });
+
+    it('应该能够使用createInjector创建注入器', () => {
+      // 🔴 失败的测试：验证createInjector功能
+      const testToken = new InjectionToken<string>('TEST_TOKEN');
+
+      const injector = DI.createInjector([
+        { provide: testToken, useValue: 'test-value' }
+      ]);
+
+      expect(injector).toBeInstanceOf(EnvironmentInjector);
+      expect(injector.get(testToken)).toBe('test-value');
+
+      injector.destroy();
+    });
+
+    it('应该支持自动解析providedIn服务', () => {
+      // 🔴 失败的测试：验证自动解析功能
+      @Injectable({ providedIn: 'root' })
+      class AutoService {
+        getValue() { return 'auto-resolved'; }
+      }
+
+      // 使用createInjector创建注入器，不手动注册AutoService
+      const injector = DI.createInjector([]);
+
+      // AutoService应该被自动解析
+      const instance = injector.get(AutoService);
+      expect(instance).toBeInstanceOf(AutoService);
+      expect(instance.getValue()).toBe('auto-resolved');
+
+      injector.destroy();
+    });
+
+    it('应该支持父注入器参数', () => {
+      // 🔴 失败的测试：验证父注入器功能
+      const parentToken = new InjectionToken<string>('PARENT_TOKEN');
+      const childToken = new InjectionToken<string>('CHILD_TOKEN');
+
+      const parentInjector = DI.createInjector([
+        { provide: parentToken, useValue: 'parent-value' }
+      ]);
+
+      const childInjector = DI.createInjector([
+        { provide: childToken, useValue: 'child-value' }
+      ], parentInjector);
+
+      // 子注入器应该能访问父注入器的服务
+      expect(childInjector.get(parentToken)).toBe('parent-value');
+      expect(childInjector.get(childToken)).toBe('child-value');
+
+      childInjector.destroy();
+      parentInjector.destroy();
+    });
+
+    it('应该与EnvironmentInjector.createWithAutoProviders等价', () => {
+      // 🔴 失败的测试：验证等价性
+      const testToken = new InjectionToken<string>('EQUIV_TOKEN');
+      const providers = [{ provide: testToken, useValue: 'equiv-value' }];
+
+      const injector1 = DI.createInjector(providers);
+      const injector2 = EnvironmentInjector.createWithAutoProviders(providers);
+
+      // 两种方式创建的注入器应该行为一致
+      expect(injector1.get(testToken)).toBe(injector2.get(testToken));
+      expect(injector1.get(testToken)).toBe('equiv-value');
+      expect(injector2.get(testToken)).toBe('equiv-value');
+
+      injector1.destroy();
+      injector2.destroy();
+    });
+  });
 });

@@ -67,34 +67,26 @@ describe('注入选项控制 (InjectOptions)', () => {
   });
 
   it('应该验证互斥选项，self 和 skipSelf 不能同时使用', () => {
-    @Injectable({ providedIn: 'root' })
-    class ServiceWithConflictOptions {
-      constructor(
-        @Inject(testToken, { self: true, skipSelf: true }) public value: string
-      ) {}
-    }
-
-    const injector = EnvironmentInjector.createWithAutoProviders([
-      { provide: testToken, useValue: 'test-value' }
-    ]);
-    
-    expect(() => injector.get(ServiceWithConflictOptions))
-      .toThrow('InjectOptions: self 和 skipSelf 选项不能同时使用');
+    // 现在冲突检测在装饰器应用时就会抛出错误
+    expect(() => {
+      @Injectable({ providedIn: 'root' })
+      class ServiceWithConflictOptions {
+        constructor(
+          @Inject(testToken, { self: true, skipSelf: true }) public value: string
+        ) {}
+      }
+    }).toThrow(/选项冲突/);
   });
 
   it('应该验证互斥选项，host 不能与其他选项同时使用', () => {
-    @Injectable({ providedIn: 'root' })
-    class ServiceWithHostConflict {
-      constructor(
-        @Inject(testToken, { host: true, self: true }) public value: string
-      ) {}
-    }
-
-    const injector = EnvironmentInjector.createWithAutoProviders([
-      { provide: testToken, useValue: 'test-value' }
-    ]);
-    
-    expect(() => injector.get(ServiceWithHostConflict))
-      .toThrow('InjectOptions: host 选项不能与 self 或 skipSelf 同时使用');
+    // 现在冲突检测在装饰器应用时就会抛出错误
+    expect(() => {
+      @Injectable({ providedIn: 'root' })
+      class ServiceWithHostConflict {
+        constructor(
+          @Inject(testToken, { host: true, self: true }) public value: string
+        ) {}
+      }
+    }).toThrow(/选项冲突/);
   });
 });
