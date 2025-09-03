@@ -2,8 +2,13 @@ import { EnvironmentInjector } from './environment-injector';
 import { Injectable } from './injectable';
 import { Inject } from './inject';
 import { InjectionToken } from './injection-token';
+import { resetRootInjector } from './index';
 
 describe('循环依赖检测', () => {
+  // 在每个测试后重置根注入器
+  afterEach(() => {
+    resetRootInjector();
+  });
   it('应该检测到直接的循环依赖并抛出错误', () => {
     @Injectable({ providedIn: 'root' })
     class ServiceA {
@@ -99,7 +104,7 @@ describe('循环依赖检测', () => {
       ) {}
     }
 
-    const injector = EnvironmentInjector.createWithAutoProviders([
+    const injector = EnvironmentInjector.createRootInjector([
       { provide: 'ServiceA', useClass: ServiceA }
     ]);
 
@@ -140,7 +145,7 @@ describe('循环依赖检测', () => {
       value = 'normal';
     }
 
-    const injector = EnvironmentInjector.createWithAutoProviders([]);
+    const injector = EnvironmentInjector.createRootInjector([]);
 
     // 第一次获取
     const service1 = injector.get(NormalService);

@@ -144,9 +144,9 @@ describe('Auto 作用域和层次结构测试', () => {
   });
 
   describe('createInjector 默认行为', () => {
-    it('createInjector 默认应该创建 auto 作用域的注入器', () => {
+    it('createInjector 默认应该创建 root 作用域的注入器', () => {
       const injector = createInjector([]);
-      expect(injector.scope).toBe('auto');
+      expect(injector.scope).toBe('root');
     });
 
     it('createInjector 应该支持指定作用域', () => {
@@ -161,25 +161,27 @@ describe('Auto 作用域和层次结构测试', () => {
       expect(featureInjector.scope).toBe('feature');
     });
 
-    it('auto 作用域注入器应该能解析 auto 服务', () => {
-      const autoInjector = createInjector([]);
-      const service = autoInjector.get(AutoService);
+    it('root 作用域注入器应该能解析 auto 服务', () => {
+      const rootInjector = createInjector([]);
+      const service = rootInjector.get(AutoService);
       expect(service.getValue()).toBe('auto');
     });
 
-    it('auto 作用域注入器不应该解析其他特定作用域的服务', () => {
-      const autoInjector = createInjector([]);
-      
-      expect(() => autoInjector.get(RootService))
-        .toThrow('No provider for RootService');
-      
-      expect(() => autoInjector.get(PlatformService))
+    it('root 作用域注入器应该能解析 root 服务，但不能解析其他作用域的服务', () => {
+      const rootInjector = createInjector([]);
+
+      // 应该能解析 root 服务
+      const rootService = rootInjector.get(RootService);
+      expect(rootService.getValue()).toBe('root');
+
+      // 不能解析其他作用域的服务
+      expect(() => rootInjector.get(PlatformService))
         .toThrow('No provider for PlatformService');
-      
-      expect(() => autoInjector.get(ApplicationService))
+
+      expect(() => rootInjector.get(ApplicationService))
         .toThrow('No provider for ApplicationService');
-      
-      expect(() => autoInjector.get(FeatureService))
+
+      expect(() => rootInjector.get(FeatureService))
         .toThrow('No provider for FeatureService');
     });
   });

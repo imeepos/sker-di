@@ -3,9 +3,15 @@ import { Injectable } from './injectable';
 import { Inject } from './inject';
 import { InjectionToken } from './injection-token';
 import { InjectOptions } from './inject-options';
+import { resetRootInjector } from './index';
 
 describe('注入选项控制 (InjectOptions)', () => {
   const testToken = new InjectionToken<string>('测试令牌');
+
+  // 在每个测试后重置根注入器
+  afterEach(() => {
+    resetRootInjector();
+  });
   
   it('optional: true - 当依赖不存在时应返回 null 而不是抛出错误', () => {
     @Injectable({ providedIn: 'root' })
@@ -15,8 +21,8 @@ describe('注入选项控制 (InjectOptions)', () => {
       ) {}
     }
 
-    const injector = EnvironmentInjector.createWithAutoProviders([]);
-    
+    const injector = EnvironmentInjector.createRootInjector([]);
+
     const service = injector.get(ServiceWithOptional);
     expect(service).toBeInstanceOf(ServiceWithOptional);
     expect(service.optionalValue).toBeNull();
@@ -54,8 +60,8 @@ describe('注入选项控制 (InjectOptions)', () => {
       ) {}
     }
 
-    const injector = EnvironmentInjector.createWithAutoProviders([]);
-    
+    const injector = EnvironmentInjector.createRootInjector([]);
+
     const service = injector.get(ServiceWithCombinedOptions);
     expect(service).toBeInstanceOf(ServiceWithCombinedOptions);
     expect(service.value).toBeNull();

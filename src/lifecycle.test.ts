@@ -1,8 +1,13 @@
 import { EnvironmentInjector } from './environment-injector';
 import { Injectable } from './injectable';
 import { OnDestroy, isOnDestroy } from './lifecycle';
+import { resetRootInjector } from './index';
 
 describe('生命周期管理', () => {
+  // 在每个测试后重置根注入器
+  afterEach(() => {
+    resetRootInjector();
+  });
   it('应该在服务销毁时调用 ngOnDestroy', () => {
     const destroySpy = jest.fn();
 
@@ -13,7 +18,7 @@ describe('生命周期管理', () => {
       }
     }
 
-    const injector = EnvironmentInjector.createWithAutoProviders([]);
+    const injector = EnvironmentInjector.createRootInjector([]);
     const service = injector.get(ServiceWithDestroy);
 
     expect(service).toBeInstanceOf(ServiceWithDestroy);
@@ -42,7 +47,7 @@ describe('生命周期管理', () => {
       }
     }
 
-    const injector = EnvironmentInjector.createWithAutoProviders([]);
+    const injector = EnvironmentInjector.createRootInjector([]);
     
     // 获取两个服务实例
     injector.get(Service1);
@@ -64,7 +69,7 @@ describe('生命周期管理', () => {
       value = 'test';
     }
 
-    const injector = EnvironmentInjector.createWithAutoProviders([]);
+    const injector = EnvironmentInjector.createRootInjector([]);
     const service = injector.get(ServiceWithoutDestroy);
 
     expect(service).toBeInstanceOf(ServiceWithoutDestroy);
@@ -101,7 +106,7 @@ describe('生命周期管理', () => {
       }
     }
 
-    const injector = EnvironmentInjector.createWithAutoProviders([]);
+    const injector = EnvironmentInjector.createRootInjector([]);
     
     injector.get(Service1);
     injector.get(Service2);
@@ -126,7 +131,7 @@ describe('生命周期管理', () => {
       }
     }
 
-    const injector = EnvironmentInjector.createWithAutoProviders([]);
+    const injector = EnvironmentInjector.createRootInjector([]);
     injector.get(ServiceWithDestroy);
 
     // 第一次销毁
@@ -144,7 +149,7 @@ describe('生命周期管理', () => {
       value = 'test';
     }
 
-    const injector = EnvironmentInjector.createWithAutoProviders([]);
+    const injector = EnvironmentInjector.createRootInjector([]);
     const service = injector.get(TestService);
     expect(service).toBeInstanceOf(TestService);
 

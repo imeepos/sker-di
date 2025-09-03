@@ -754,7 +754,7 @@ export class EnvironmentInjector extends Injector {
     }
 
     // 解析规则：
-    // 1. 'auto' 作用域可以在任何注入器中解析
+    // 1. 'auto' 作用域的服务可以在任何注入器中解析
     // 2. 其他作用域只能在对应的注入器中解析
     return providedIn === 'auto' || this.scope === providedIn;
   }

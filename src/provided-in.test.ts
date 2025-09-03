@@ -2,9 +2,15 @@ import { EnvironmentInjector } from './environment-injector';
 import { Injectable } from './injectable';
 import { Inject } from './inject';
 import { InjectionToken } from './injection-token';
+import { resetRootInjector } from './index';
 
 describe('providedIn 选项支持', () => {
   const testToken = new InjectionToken<string>('测试令牌');
+
+  // 在每个测试后重置根注入器
+  afterEach(() => {
+    resetRootInjector();
+  });
 
   it('providedIn: "root" 的服务应该能在根注入器中自动注册', () => {
     @Injectable({ providedIn: 'root' })
@@ -12,9 +18,9 @@ describe('providedIn 选项支持', () => {
       name = 'root-service';
     }
 
-    // 创建一个支持 providedIn 的注入器
-    const injector = EnvironmentInjector.createWithAutoProviders([]);
-    
+    // 创建根注入器来测试 providedIn: 'root' 的服务
+    const injector = EnvironmentInjector.createRootInjector([]);
+
     const service = injector.get(RootService);
     expect(service).toBeInstanceOf(RootService);
     expect(service.name).toBe('root-service');
@@ -33,14 +39,14 @@ describe('providedIn 选项支持', () => {
   });
 
   it('应该支持 providedIn 服务的工厂函数配置', () => {
-    @Injectable({ 
+    @Injectable({
       providedIn: 'root',
       useFactory: () => ({ factoryValue: 'created-by-factory' })
     })
     class FactoryService {}
 
-    const injector = EnvironmentInjector.createWithAutoProviders([]);
-    
+    const injector = EnvironmentInjector.createRootInjector([]);
+
     const service = injector.get(FactoryService);
     expect(service).toEqual({ factoryValue: 'created-by-factory' });
   });
@@ -56,8 +62,8 @@ describe('providedIn 选项支持', () => {
       constructor(public dep: DependencyService) {}
     }
 
-    const injector = EnvironmentInjector.createWithAutoProviders([]);
-    
+    const injector = EnvironmentInjector.createRootInjector([]);
+
     const service = injector.get(ServiceWithDep);
     expect(service).toBeInstanceOf(ServiceWithDep);
     expect(service.dep).toBeInstanceOf(DependencyService);
@@ -74,8 +80,8 @@ describe('providedIn 选项支持', () => {
       constructor(@Inject(testToken) public value: string) {}
     }
 
-    const injector = EnvironmentInjector.createWithAutoProviders(providers);
-    
+    const injector = EnvironmentInjector.createRootInjector(providers);
+
     const service = injector.get(ServiceWithInject);
     expect(service).toBeInstanceOf(ServiceWithInject);
     expect(service.value).toBe('injected-value');

@@ -120,13 +120,13 @@ export {
 export const NULL_INJECTOR = new NullInjector();
 
 /**
- * 创建注入器（默认为 auto 作用域）
+ * 创建注入器（默认为 root 作用域）
  *
  * @param providers 提供者数组
  * @param parent 父注入器
- * @param scope 注入器作用域，默认为 'auto'
+ * @param scope 注入器作用域，默认为 'root'
  */
-export function createInjector(providers: Provider[], parent: Injector = NULL_INJECTOR, scope: 'root' | 'platform' | 'application' | 'feature' | 'auto' = 'auto') {
+export function createInjector(providers: Provider[], parent: Injector = NULL_INJECTOR, scope: 'root' | 'platform' | 'application' | 'feature' | 'auto' = 'root') {
   return EnvironmentInjector.createWithAutoProviders(providers, parent, scope);
 }
 
