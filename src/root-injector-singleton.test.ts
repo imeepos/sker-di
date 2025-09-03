@@ -128,7 +128,7 @@ describe('根注入器单例测试', () => {
       // 创建应用注入器
       const appInjector = createApplicationInjector([
         { provide: 'APP_TOKEN', useValue: 'app' }
-      ], platformInjector);
+      ]);
       
       // 验证层次关系
       expect(platformInjector.parent).toBe(rootInjector);

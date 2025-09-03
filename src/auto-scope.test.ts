@@ -6,10 +6,15 @@ import {
   createPlatformInjector,
   createApplicationInjector,
   createFeatureInjector,
-  createInjector
+  createInjector,
+  resetRootInjector
 } from './index';
 
 describe('Auto 作用域和层次结构测试', () => {
+  // 在每个测试后重置根注入器
+  afterEach(() => {
+    resetRootInjector();
+  });
   // 定义不同作用域的服务
   @Injectable({ providedIn: 'auto' })
   class AutoService {
@@ -38,9 +43,9 @@ describe('Auto 作用域和层次结构测试', () => {
 
   describe('Auto 作用域测试', () => {
     it('auto 服务应该可以在任何注入器中解析', () => {
-      const rootInjector = createRootInjector() as EnvironmentInjector;
-      const platformInjector = createPlatformInjector([], rootInjector);
-      const appInjector = createApplicationInjector([], platformInjector);
+      const rootInjector = createRootInjector();
+      const platformInjector = createPlatformInjector();
+      const appInjector = createApplicationInjector();
       const featureInjector = createFeatureInjector([], appInjector);
       
       // auto 服务应该在所有注入器中都能解析
@@ -52,8 +57,8 @@ describe('Auto 作用域和层次结构测试', () => {
 
     it('auto 服务在不同注入器中应该是不同实例', () => {
       const rootInjector = createRootInjector();
-      const platformInjector = createPlatformInjector([], rootInjector);
-      const appInjector = createApplicationInjector([], platformInjector);
+      const platformInjector = createPlatformInjector();
+      const appInjector = createApplicationInjector();
       
       const rootService = rootInjector.get(AutoService);
       const platformService = platformInjector.get(AutoService);
@@ -79,8 +84,8 @@ describe('Auto 作用域和层次结构测试', () => {
     it('应该支持正确的层次结构: Root → Platform → Application → Feature', () => {
       // 创建正确的层次结构
       const rootInjector = createRootInjector();
-      const platformInjector = createPlatformInjector([], rootInjector);
-      const appInjector = createApplicationInjector([], platformInjector);
+      const platformInjector = createPlatformInjector();
+      const appInjector = createApplicationInjector();
       const featureInjector = createFeatureInjector([], appInjector);
       
       // 验证层次关系
@@ -97,8 +102,8 @@ describe('Auto 作用域和层次结构测试', () => {
 
     it('应该通过层次结构正确解析服务', () => {
       const rootInjector = createRootInjector();
-      const platformInjector = createPlatformInjector([], rootInjector);
-      const appInjector = createApplicationInjector([], platformInjector);
+      const platformInjector = createPlatformInjector();
+      const appInjector = createApplicationInjector();
       const featureInjector = createFeatureInjector([], appInjector);
       
       // 从最底层获取所有服务
@@ -117,9 +122,9 @@ describe('Auto 作用域和层次结构测试', () => {
 
     it('应该确保服务在正确的层级实例化', () => {
       const rootInjector = createRootInjector();
-      const platformInjector = createPlatformInjector([], rootInjector);
-      const app1Injector = createApplicationInjector([], platformInjector);
-      const app2Injector = createApplicationInjector([], platformInjector);
+      const platformInjector = createPlatformInjector();
+      const app1Injector = createApplicationInjector();
+      const app2Injector = createApplicationInjector();
       
       // root 和 platform 服务应该在所有子注入器中共享
       const rootService1 = app1Injector.get(RootService);
@@ -180,23 +185,26 @@ describe('Auto 作用域和层次结构测试', () => {
   });
 
   describe('灵活的组合使用', () => {
-    it('应该支持灵活的注入器组合', () => {
-      // 创建一个混合的层次结构
+    it('应该支持标准的层次结构组合', () => {
+      // 创建标准的层次结构
       const rootInjector = createRootInjector();
-      const autoInjector = createInjector([], rootInjector, 'auto');
-      const platformInjector = createPlatformInjector([], autoInjector);
-      
+      const platformInjector = createPlatformInjector();
+      const autoInjector = createInjector([], platformInjector, 'auto');
+
       // auto 注入器可以解析 auto 服务
       const autoService = autoInjector.get(AutoService);
       expect(autoService.getValue()).toBe('auto');
-      
-      // platform 注入器可以解析 platform 和 auto 服务
-      const platformService = platformInjector.get(PlatformService);
-      const inheritedAutoService = platformInjector.get(AutoService);
-      
+
+      // auto 注入器也可以解析父级的 platform 服务
+      const platformService = autoInjector.get(PlatformService);
+      const rootService = autoInjector.get(RootService);
+
       expect(platformService.getValue()).toBe('platform');
-      expect(inheritedAutoService.getValue()).toBe('auto');
-      expect(inheritedAutoService).toBe(autoService); // 从父级继承
+      expect(rootService.getValue()).toBe('root');
+
+      // 验证层次关系
+      expect(autoInjector.parent).toBe(platformInjector);
+      expect(platformInjector.parent).toBe(rootInjector);
     });
   });
 });

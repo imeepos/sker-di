@@ -1,9 +1,13 @@
 import 'reflect-metadata';
 import { Injectable } from './injectable';
-import { createPlatformInjector, createApplicationInjector } from './index';
+import { createRootInjector, createPlatformInjector, createApplicationInjector, resetRootInjector } from './index';
 import { InjectionToken } from './injection-token';
 
 describe('Platform 注入器支持', () => {
+  // 在每个测试后重置根注入器
+  afterEach(() => {
+    resetRootInjector();
+  });
   describe('createPlatformInjector', () => {
     it('应该创建平台注入器并自动解析 providedIn: "platform" 的服务', () => {
       @Injectable({ providedIn: 'platform' })
@@ -13,6 +17,7 @@ describe('Platform 注入器支持', () => {
         }
       }
 
+      createRootInjector(); // 必须先创建根注入器
       const platformInjector = createPlatformInjector();
       
       const logger = platformInjector.get(PlatformLoggerService);
@@ -28,6 +33,7 @@ describe('Platform 注入器支持', () => {
         }
       }
 
+      createRootInjector(); // 必须先创建根注入器
       const platformInjector = createPlatformInjector();
       
       const service = platformInjector.get(RootService);
@@ -38,6 +44,7 @@ describe('Platform 注入器支持', () => {
     it('应该支持手动注册的提供者', () => {
       const CONFIG_TOKEN = new InjectionToken<{ version: string }>('CONFIG');
       
+      createRootInjector(); // 必须先创建根注入器
       const platformInjector = createPlatformInjector([
         { provide: CONFIG_TOKEN, useValue: { version: '1.0.0' } }
       ]);
@@ -47,6 +54,7 @@ describe('Platform 注入器支持', () => {
     });
 
     it('应该正确标识为平台注入器', () => {
+      createRootInjector(); // 必须先创建根注入器
       const platformInjector = createPlatformInjector();
       expect(platformInjector.scope).toBe('platform');
     });
@@ -68,8 +76,9 @@ describe('Platform 注入器支持', () => {
         }
       }
 
-      const platformInjector = createPlatformInjector();
-      const appInjector = createApplicationInjector([], platformInjector);
+      createRootInjector(); // 必须先创建根注入器
+      createPlatformInjector(); // 必须先创建平台注入器
+      const appInjector = createApplicationInjector();
       
       // 应该能获取平台服务
       const platformService = appInjector.get(PlatformService);
@@ -81,8 +90,9 @@ describe('Platform 注入器支持', () => {
     });
 
     it('应该正确标识为应用注入器', () => {
-      const platformInjector = createPlatformInjector();
-      const appInjector = createApplicationInjector([], platformInjector);
+      createRootInjector(); // 必须先创建根注入器
+      createPlatformInjector(); // 必须先创建平台注入器
+      const appInjector = createApplicationInjector();
       
       expect(appInjector.scope).toBe('application');
     });
@@ -95,8 +105,9 @@ describe('Platform 注入器支持', () => {
         }
       }
 
+      createRootInjector(); // 必须先创建根注入器
       const platformInjector = createPlatformInjector();
-      const appInjector = createApplicationInjector([], platformInjector);
+      const appInjector = createApplicationInjector();
       
       // 平台注入器可以解析
       const platformService = platformInjector.get(PlatformOnlyService);
@@ -127,10 +138,11 @@ describe('Platform 注入器支持', () => {
       const APP_TOKEN = new InjectionToken<string>('APP_TOKEN');
       
       // 创建层次结构
+      createRootInjector(); // 必须先创建根注入器
       const platformInjector = createPlatformInjector();
       const appInjector = createApplicationInjector([
         { provide: APP_TOKEN, useValue: 'app-specific' }
-      ], platformInjector);
+      ]);
       
       // 验证层次结构
       expect(appInjector.parent).toBe(platformInjector);
@@ -161,10 +173,11 @@ describe('Platform 注入器支持', () => {
       }
 
       SingletonService.resetCount();
-      
+
+      createRootInjector(); // 必须先创建根注入器
       const platformInjector = createPlatformInjector();
-      const app1Injector = createApplicationInjector([], platformInjector);
-      const app2Injector = createApplicationInjector([], platformInjector);
+      const app1Injector = createApplicationInjector();
+      const app2Injector = createApplicationInjector();
       
       const service1 = app1Injector.get(SingletonService);
       const service2 = app2Injector.get(SingletonService);

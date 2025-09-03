@@ -130,11 +130,11 @@ describe('平台注入器单例测试', () => {
       // 创建多个应用注入器，都使用同一个平台注入器
       const app1Injector = createApplicationInjector([
         { provide: 'APP1_TOKEN', useValue: 'app1-value' }
-      ], platformInjector);
-      
+      ]);
+
       const app2Injector = createApplicationInjector([
         { provide: 'APP2_TOKEN', useValue: 'app2-value' }
-      ], platformInjector);
+      ]);
       
       // 验证都使用同一个平台注入器
       expect(app1Injector.parent).toBe(platformInjector);
@@ -170,7 +170,7 @@ describe('平台注入器单例测试', () => {
     it('子注入器应该能继承平台注入器的服务', () => {
       createRootInjector();
       const platformInjector = createPlatformInjector();
-      const appInjector = createApplicationInjector([], platformInjector);
+      const appInjector = createApplicationInjector();
       
       const platformService1 = platformInjector.get(PlatformService);
       const platformService2 = appInjector.get(PlatformService);
@@ -191,8 +191,8 @@ describe('平台注入器单例测试', () => {
     it('多个应用应该共享平台服务实例', () => {
       createRootInjector();
       const platformInjector = createPlatformInjector();
-      const app1Injector = createApplicationInjector([], platformInjector);
-      const app2Injector = createApplicationInjector([], platformInjector);
+      const app1Injector = createApplicationInjector();
+      const app2Injector = createApplicationInjector();
       
       const platformService1 = app1Injector.get(PlatformService);
       const platformService2 = app2Injector.get(PlatformService);

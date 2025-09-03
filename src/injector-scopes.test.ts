@@ -1,13 +1,19 @@
 import 'reflect-metadata';
 import { Injectable } from './injectable';
-import { 
-  createPlatformInjector, 
-  createApplicationInjector, 
+import {
+  createRootInjector,
+  createPlatformInjector,
+  createApplicationInjector,
   createFeatureInjector,
-  createInjector 
+  createInjector,
+  resetRootInjector
 } from './index';
 
 describe('注入器作用域统一测试', () => {
+  // 在每个测试后重置根注入器
+  afterEach(() => {
+    resetRootInjector();
+  });
   // 定义不同作用域的服务
   @Injectable({ providedIn: 'platform' })
   class PlatformService {
@@ -36,16 +42,18 @@ describe('注入器作用域统一测试', () => {
 
   describe('作用域解析规则', () => {
     it('平台注入器应该只解析 platform 服务', () => {
+      createRootInjector(); // 必须先创建根注入器
       const platformInjector = createPlatformInjector();
 
       // 可以解析 platform 服务
       const platformService = platformInjector.get(PlatformService);
       expect(platformService.getValue()).toBe('platform');
 
-      // 不能解析其他作用域的服务
-      expect(() => platformInjector.get(RootService))
-        .toThrow('No provider for RootService');
+      // 可以解析根服务（通过层次结构）
+      const rootService = platformInjector.get(RootService);
+      expect(rootService.getValue()).toBe('root');
 
+      // 不能解析其他作用域的服务
       expect(() => platformInjector.get(ApplicationService))
         .toThrow('No provider for ApplicationService');
 
@@ -54,20 +62,20 @@ describe('注入器作用域统一测试', () => {
     });
 
     it('应用注入器应该只解析 application 服务，其他通过层次继承', () => {
-      const platformInjector = createPlatformInjector();
-      const appInjector = createApplicationInjector([], platformInjector);
+      createRootInjector(); // 必须先创建根注入器
+      createPlatformInjector(); // 必须先创建平台注入器
+      const appInjector = createApplicationInjector();
 
       // 可以解析 application 服务
       const appService = appInjector.get(ApplicationService);
       expect(appService.getValue()).toBe('application');
 
-      // 可以从父级获取 platform 服务
+      // 可以从父级获取 platform 服务和根服务
       const platformService = appInjector.get(PlatformService);
       expect(platformService.getValue()).toBe('platform');
 
-      // 不能解析 root 服务（需要专门的 root 注入器）
-      expect(() => appInjector.get(RootService))
-        .toThrow('No provider for RootService');
+      const rootService = appInjector.get(RootService);
+      expect(rootService.getValue()).toBe('root');
 
       // 不能解析 feature 服务
       expect(() => appInjector.get(FeatureService))
@@ -75,8 +83,9 @@ describe('注入器作用域统一测试', () => {
     });
 
     it('功能注入器应该只解析 feature 服务，其他通过层次继承', () => {
-      const platformInjector = createPlatformInjector();
-      const appInjector = createApplicationInjector([], platformInjector);
+      createRootInjector(); // 必须先创建根注入器
+      createPlatformInjector(); // 必须先创建平台注入器
+      const appInjector = createApplicationInjector();
       const featureInjector = createFeatureInjector([], appInjector);
 
       // 可以解析 feature 服务
@@ -87,17 +96,18 @@ describe('注入器作用域统一测试', () => {
       const appService = featureInjector.get(ApplicationService);
       expect(appService.getValue()).toBe('application');
 
-      // 可以从祖父级获取 platform 服务
+      // 可以从祖父级获取 platform 服务和根服务
       const platformService = featureInjector.get(PlatformService);
       expect(platformService.getValue()).toBe('platform');
 
-      // 不能解析 root 服务（需要专门的 root 注入器）
-      expect(() => featureInjector.get(RootService))
-        .toThrow('No provider for RootService');
+      const rootService = featureInjector.get(RootService);
+      expect(rootService.getValue()).toBe('root');
     });
 
     it('根注入器应该只解析 root 服务', () => {
-      const rootInjector = createInjector([]);
+      const rootInjector = createInjector([
+        { provide: RootService, useClass: RootService }
+      ]);
       
       // 可以解析 root 服务
       const rootService = rootInjector.get(RootService);
@@ -117,10 +127,11 @@ describe('注入器作用域统一测试', () => {
 
   describe('作用域标识', () => {
     it('应该正确标识各个注入器的作用域', () => {
+      createRootInjector(); // 必须先创建根注入器
       const platformInjector = createPlatformInjector();
-      const appInjector = createApplicationInjector([], platformInjector);
+      const appInjector = createApplicationInjector();
       const featureInjector = createFeatureInjector([], appInjector);
-      const rootInjector = createInjector([]);
+      const rootInjector = createInjector([], undefined, 'root');
       
       expect(platformInjector.scope).toBe('platform');
       expect(appInjector.scope).toBe('application');
@@ -131,9 +142,10 @@ describe('注入器作用域统一测试', () => {
 
   describe('服务单例性', () => {
     it('同作用域的服务应该保持单例', () => {
+      createRootInjector(); // 必须先创建根注入器
       const platformInjector = createPlatformInjector();
-      const app1Injector = createApplicationInjector([], platformInjector);
-      const app2Injector = createApplicationInjector([], platformInjector);
+      const app1Injector = createApplicationInjector();
+      const app2Injector = createApplicationInjector();
       
       // platform 服务在所有子注入器中应该是同一个实例
       const platform1 = app1Injector.get(PlatformService);
@@ -151,8 +163,9 @@ describe('注入器作用域统一测试', () => {
     });
 
     it('feature 服务应该在不同功能模块中独立', () => {
-      const platformInjector = createPlatformInjector();
-      const appInjector = createApplicationInjector([], platformInjector);
+      createRootInjector(); // 必须先创建根注入器
+      createPlatformInjector(); // 必须先创建平台注入器
+      const appInjector = createApplicationInjector();
       const feature1Injector = createFeatureInjector([], appInjector);
       const feature2Injector = createFeatureInjector([], appInjector);
       
@@ -185,9 +198,10 @@ describe('注入器作用域统一测试', () => {
   describe('完整的层次结构', () => {
     it('应该支持完整的注入器层次结构', () => {
       // 创建完整的层次结构，包含专门的 root 注入器
+      createRootInjector(); // 必须先创建根注入器
       const platformInjector = createPlatformInjector();
-      const appInjector = createApplicationInjector([], platformInjector);
-      const rootInjector = createInjector([], appInjector); // root 注入器
+      const appInjector = createApplicationInjector();
+      const rootInjector = createInjector([], appInjector, 'root'); // root 注入器
       const featureInjector = createFeatureInjector([], rootInjector);
 
       // 验证层次关系
@@ -209,9 +223,10 @@ describe('注入器作用域统一测试', () => {
 
     it('应该展示清晰的作用域职责分离', () => {
       // 每个注入器只负责自己作用域的服务
+      createRootInjector(); // 必须先创建根注入器
       const platformInjector = createPlatformInjector();
-      const appInjector = createApplicationInjector([], platformInjector);
-      const rootInjector = createInjector([], appInjector);
+      const appInjector = createApplicationInjector();
+      const rootInjector = createInjector([], appInjector, 'root');
       const featureInjector = createFeatureInjector([], rootInjector);
 
       // 验证各自的作用域
@@ -224,16 +239,16 @@ describe('注入器作用域统一测试', () => {
       // 平台注入器
       expect(() => platformInjector.get(PlatformService)).not.toThrow();
       expect(() => platformInjector.get(ApplicationService)).toThrow();
-      expect(() => platformInjector.get(RootService)).toThrow();
+      expect(() => platformInjector.get(RootService)).not.toThrow(); // 可以从父级继承
       expect(() => platformInjector.get(FeatureService)).toThrow();
 
       // 应用注入器
       expect(() => appInjector.get(ApplicationService)).not.toThrow();
       expect(() => appInjector.get(PlatformService)).not.toThrow(); // 从父级继承
-      expect(() => appInjector.get(RootService)).toThrow();
+      expect(() => appInjector.get(RootService)).not.toThrow(); // 从祖父级继承
       expect(() => appInjector.get(FeatureService)).toThrow();
 
-      // 根注入器
+      // 根注入器（这里是自定义的 root 作用域注入器，不是全局根注入器）
       expect(() => rootInjector.get(RootService)).not.toThrow();
       expect(() => rootInjector.get(ApplicationService)).not.toThrow(); // 从父级继承
       expect(() => rootInjector.get(PlatformService)).not.toThrow(); // 从祖父级继承
