@@ -45,7 +45,7 @@ export class EnvironmentInjector extends Injector {
     super(parent || new NullInjector());
     this.injectorId = EnvironmentInjectorUtils.generateInjectorId();
     this.scope = scope;
-    this.setupProviders(providers);
+    this.setupProviders([...providers, { provide: Injector, useValue: this }]);
     this.registerDebugInfo();
   }
 
@@ -207,7 +207,7 @@ export class EnvironmentInjector extends Injector {
     // 解析ForwardRef
     const resolvedToken = resolveForwardRefCached(token);
     const tokenName = this.getTokenName(resolvedToken);
-    
+
     // 调试日志：记录依赖请求
     this.debugger.logEvent({
       type: DebugEventType.DependencyRequested,
@@ -233,7 +233,7 @@ export class EnvironmentInjector extends Injector {
     // 检查缓存
     if (this.instances.has(resolvedToken)) {
       const instance = this.instances.get(resolvedToken);
-      
+
       // 调试日志：缓存命中
       this.debugger.logEvent({
         type: DebugEventType.InstanceCached,
@@ -251,7 +251,7 @@ export class EnvironmentInjector extends Injector {
     if (this.resolvingTokens.has(resolvedToken)) {
       const pathStr = this.dependencyPath.map(t => this.getTokenName(t)).join(' -> ');
       const errorMessage = `检测到循环依赖: ${pathStr} -> ${tokenName}`;
-      
+
       // 调试日志：循环依赖检测
       this.debugger.logEvent({
         type: DebugEventType.CircularDependencyDetected,
@@ -272,7 +272,7 @@ export class EnvironmentInjector extends Injector {
 
     try {
       let result: T;
-      
+
       // 查找提供者
       const tokenProviders = this.providers.get(resolvedToken);
       if (tokenProviders) {
@@ -391,18 +391,18 @@ export class EnvironmentInjector extends Injector {
     if ('useValue' in provider) {
       return provider.useValue;
     }
-    
+
     if ('useClass' in provider) {
       const resolvedClass = resolveForwardRefCached(provider.useClass);
       return this.createInstanceWithDI(resolvedClass);
     }
-    
+
     if ('useFactory' in provider) {
       const resolvedDeps = resolveForwardRefsInDeps(provider.deps);
       const deps = (resolvedDeps || []).map(dep => this.get(dep));
       return provider.useFactory(...deps);
     }
-    
+
     if ('useExisting' in provider) {
       const resolvedExisting = resolveForwardRefCached(provider.useExisting);
       return this.get(resolvedExisting);
@@ -419,11 +419,11 @@ export class EnvironmentInjector extends Injector {
     // 获取注入元数据
     const injectMetadata = getInjectMetadata(ClassConstructor);
     const injectOptions = getInjectOptionsMetadata(ClassConstructor);
-    
+
     if (!injectMetadata || injectMetadata.length === 0) {
       // 没有依赖，直接创建
       const instance = new ClassConstructor();
-      
+
       // 调试日志：实例创建
       this.debugger.logEvent({
         type: DebugEventType.InstanceCreated,
@@ -445,7 +445,7 @@ export class EnvironmentInjector extends Injector {
       if (token === undefined) {
         throw new Error(`Cannot resolve dependency at index ${index} for ${ClassConstructor.name}. Make sure to use @Inject() decorator.`);
       }
-      
+
       const options = injectOptions?.[index] || {};
       const resolvedToken = resolveForwardRefCached(token);
       return this.resolveDependency(resolvedToken, options);
@@ -763,8 +763,8 @@ export class EnvironmentInjector extends Injector {
    * 注册调试信息
    */
   private registerDebugInfo(): void {
-    const parentId = this.parent instanceof EnvironmentInjector 
-      ? (this.parent as any).injectorId 
+    const parentId = this.parent instanceof EnvironmentInjector
+      ? (this.parent as any).injectorId
       : undefined;
 
     const debugInfo: InjectorDebugInfo = {
