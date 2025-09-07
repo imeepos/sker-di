@@ -1,6 +1,6 @@
 # @sker/di
 
-一个现代化的 TypeScript 依赖注入（DI）系统，借鉴 Angular DI 的核心设计理念，为通用场景提供类型安全的依赖注入解决方案。
+🚀 **一切皆服务，一切皆可注入！** - 现代化的 TypeScript 依赖注入（DI）系统，借鉴 Angular DI 的核心设计理念，为通用场景提供类型安全的依赖注入解决方案。
 
 ## 特性
 
@@ -15,6 +15,8 @@
 - **📊 持续监控** - 自动化测试和覆盖率报告
 
 ### ✨ 核心特性
+- 🚀 **一切皆服务** - 所有核心组件都实现为可注入服务，消除静态单例模式
+- 🔗 **一切皆可注入** - 完整的依赖注入体系，支持任意层级的服务注入
 - 🔒 **类型安全** - 完整的 TypeScript 类型支持，编译期错误检查
 - 🏗️ **严格层次架构** - Root → Platform → Application → Feature 四层结构
 - 🔒 **单例保护** - Root 和 Platform 注入器全局单例，防止架构混乱
@@ -108,15 +110,14 @@ const apiService = injector.get(ApiService);
 console.log(apiService.fetchUser());
 ```
 
-### 🏗️ 企业级架构：多层注入器
+### 🏗️ 服务化架构：完全基于DI的企业级多层注入器
 
 ```typescript
 import {
-  createRootInjector,
-  createPlatformInjector,
-  createApplicationInjector,
-  createFeatureInjector,
-  Injectable
+  Injectable,
+  INJECTOR_REGISTRY,
+  PLATFORM_MANAGER,
+  createInjector
 } from '@sker/di';
 
 // 定义不同作用域的服务
@@ -135,18 +136,26 @@ class UserManagementService {
   getUsers() { return ['user1', 'user2']; }
 }
 
-// 创建严格的层次结构（强制顺序）
-const rootInjector = createRootInjector();           // 1. 根注入器（全局单例）
-const platformInjector = createPlatformInjector();   // 2. 平台注入器（全局单例）
-const webApp = createApplicationInjector();          // 3. 应用注入器（多实例）
-const userFeature = createFeatureInjector([], webApp); // 4. 功能注入器（多实例）
+// 🚀 服务化架构：通过DI管理所有层级
+const rootInjector = createInjector([]);  // 1. 根注入器（提供基础DI服务）
+
+// 获取注入器注册表服务 - 一切皆服务！
+const injectorRegistry = rootInjector.get(INJECTOR_REGISTRY);
+
+// 通过服务管理注入器生命周期 - 消除静态管理！
+const platformInjector = injectorRegistry.createPlatformInjector();  // 2. 平台注入器
+const webApp = injectorRegistry.createApplicationInjector();          // 3. 应用注入器
+const userFeature = injectorRegistry.createFeatureInjector([], webApp); // 4. 功能注入器
+
+// 获取平台管理器服务 - 一切皆可注入！
+const platformManager = rootInjector.get(PLATFORM_MANAGER);
 
 // 从任何层级获取服务
 const logger = userFeature.get(LoggerService);        // 从平台层继承
 const auth = userFeature.get(AuthService);            // 从应用层继承
 const userMgmt = userFeature.get(UserManagementService); // 功能层服务
 
-logger.log('Application started!');
+logger.log('Application started with service-based architecture!');
 ```
 
 ### 使用 InjectionToken

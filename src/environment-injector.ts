@@ -9,8 +9,8 @@ import {
   convertInjectOptionsToFlags,
   hasFlag
 } from './internal-inject-flags';
-import { isOnDestroy, OnDestroy } from './lifecycle';
-import { resolveForwardRefCached, resolveForwardRefsInDeps, isForwardRef } from './forward-ref';
+import { isOnDestroy } from './lifecycle';
+import { resolveForwardRefCached, resolveForwardRefsInDeps } from './forward-ref';
 import {
   getDebugger,
   DebugEventType,

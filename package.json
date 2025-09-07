@@ -1,7 +1,7 @@
 {
   "name": "@sker/di",
   "version": "1.0.9",
-  "description": "现代化的 TypeScript 依赖注入(DI)系统，借鉴 Angular DI 核心设计理念",
+  "description": "🚀 一切皆服务，一切皆可注入！现代化的 TypeScript 依赖注入(DI)系统，借鉴 Angular DI 核心设计理念，完全消除静态单例模式",
   "main": "dist/index.cjs",
   "module": "dist/index.mjs",
   "types": "dist/index.d.ts",
@@ -38,7 +38,11 @@
     "typescript",
     "angular",
     "ioc",
-    "container"
+    "container",
+    "service-oriented",
+    "injectable",
+    "everything-as-service",
+    "no-singleton"
   ],
   "author": "imeepos",
   "license": "ISC",

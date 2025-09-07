@@ -1,22 +1,36 @@
-# 注入器架构设计
+# 注入器架构设计：一切皆服务，一切皆可注入
 
-## 🏗️ 严格的单例层次结构
+🚀 **核心理念**：完全消除静态单例模式，所有系统组件都通过依赖注入进行管理。
+
+## 🏗️ 服务化的层次结构架构
 
 ```
-Root Injector (scope: 'root') [全局单例]
-└── Platform Injector (scope: 'platform') [全局单例]
-    ├── Application Injector 1 (scope: 'application') [多实例]
-    │   ├── Feature Injector 1A (scope: 'feature') [多实例]
-    │   └── Feature Injector 1B (scope: 'feature') [多实例]
-    └── Application Injector 2 (scope: 'application') [多实例]
-        └── Feature Injector 2A (scope: 'feature') [多实例]
+Root Injector (scope: 'root') [全局单例] 
+├── 🚀 InjectorRegistry (管理注入器生命周期)
+├── 🚀 PlatformManager (管理平台实例)  
+├── 🚀 DIDebugger (调试服务)
+└── 🚀 DIInspector (检查服务)
+    └── Platform Injector (scope: 'platform') [全局单例]
+        ├── 🚀 ApplicationManager (管理应用生命周期)
+        ├── Application Injector 1 (scope: 'application') [多实例]
+        │   ├── Feature Injector 1A (scope: 'feature') [多实例]
+        │   └── Feature Injector 1B (scope: 'feature') [多实例]
+        └── Application Injector 2 (scope: 'application') [多实例]
+            └── Feature Injector 2A (scope: 'feature') [多实例]
 ```
 
-### 🔒 单例约束
-- **Root Injector**: 全局唯一，系统基础
-- **Platform Injector**: 全局唯一，跨应用共享
-- **Application Injector**: 多实例，每个应用独立
-- **Feature Injector**: 多实例，每个功能模块独立
+### 🚀 服务化管理组件
+- **InjectorRegistry**: 注入器注册表服务，取代静态单例管理
+- **PlatformManager**: 平台管理器服务，取代全局静态变量
+- **ApplicationManager**: 应用管理器服务，管理多应用实例
+- **DIDebugger**: 调试器服务，提供运行时调试功能  
+- **DIInspector**: 检查器服务，提供性能监控和健康检查
+
+### 🔒 层次约束（现在由服务管理）
+- **Root Injector**: 提供基础DI服务，系统核心
+- **Platform Injector**: 跨应用共享，由 InjectorRegistry 管理
+- **Application Injector**: 每个应用独立，由 ApplicationManager 管理
+- **Feature Injector**: 每个功能模块独立，由应用自身管理
 
 ## 🎯 作用域职责
 
@@ -92,7 +106,64 @@ private shouldAutoResolve(providedIn: InjectorScope | null | undefined): boolean
 
 ## 📋 使用示例
 
-### 创建完整层次结构（严格顺序 + 自动父级）
+### 🚀 服务化架构使用示例（推荐方式）
+
+```typescript
+import {
+  createInjector,
+  Injectable,
+  INJECTOR_REGISTRY,
+  PLATFORM_MANAGER,
+  APPLICATION_MANAGER
+} from '@sker/di';
+
+// ✅ 服务化架构：通过DI服务管理所有组件
+
+// 1. 创建根注入器（提供基础DI服务）
+const rootInjector = createInjector([
+  { provide: 'ROOT_CONFIG', useValue: { debug: true } }
+]);
+
+// 2. 🚀 获取注入器注册表服务 - 一切皆服务！
+const injectorRegistry = rootInjector.get(INJECTOR_REGISTRY);
+
+// 3. 🚀 通过服务管理注入器生命周期 - 消除静态管理！
+const platformInjector = injectorRegistry.createPlatformInjector([
+  { provide: 'PLATFORM_CONFIG', useValue: { version: '1.0.0' } }
+]);
+
+// 4. 🚀 获取平台管理器服务 - 一切皆可注入！
+const platformManager = platformInjector.get(PLATFORM_MANAGER);
+
+// 5. 🚀 获取应用管理器服务 - 完全服务化！
+const appManager = platformInjector.get(APPLICATION_MANAGER);
+
+// 6. 🚀 通过服务创建应用 - 不再是静态函数调用！
+const webApp = await appManager.createApplication('web-app', [
+  { provide: 'APP_TYPE', useValue: 'web' }
+]);
+
+const mobileApp = await appManager.createApplication('mobile-app', [
+  { provide: 'APP_TYPE', useValue: 'mobile' }
+]);
+
+// 7. 🚀 通过应用加载功能 - 功能也是服务！
+await webApp.loadFeature({
+  name: 'user-management',
+  providers: [
+    { provide: 'FEATURE_NAME', useValue: 'user-management' }
+  ]
+});
+
+await mobileApp.loadFeature({
+  name: 'order-management', 
+  providers: [
+    { provide: 'FEATURE_NAME', useValue: 'order-management' }
+  ]
+});
+```
+
+### 📝 传统方式（向后兼容）
 
 ```typescript
 import {
@@ -102,60 +173,44 @@ import {
   createFeatureInjector
 } from '@sker/di';
 
-// ✅ 正确的创建顺序（简化的API）
+// ✅ 传统方式仍然可用（但推荐使用服务化方式）
 
-// 1. 首先创建根注入器（全局单例）
 const rootInjector = createRootInjector([
   { provide: 'ROOT_CONFIG', useValue: { debug: true } }
 ]);
 
-// 2. 创建平台注入器（全局单例，自动使用根注入器作为父级）
 const platformInjector = createPlatformInjector([
   { provide: 'PLATFORM_CONFIG', useValue: { version: '1.0.0' } }
 ]);
 
-// 3. 创建应用注入器（多实例，自动使用全局平台注入器作为父级）
 const webApp = createApplicationInjector([
   { provide: 'APP_TYPE', useValue: 'web' }
 ]);
 
-const mobileApp = createApplicationInjector([
-  { provide: 'APP_TYPE', useValue: 'mobile' }
-]);
-
-// 4. 创建功能注入器（多实例，必须指定应用注入器作为父级）
 const userFeature = createFeatureInjector([
   { provide: 'FEATURE_NAME', useValue: 'user-management' }
 ], webApp);
-
-const orderFeature = createFeatureInjector([
-  { provide: 'FEATURE_NAME', useValue: 'order-management' }
-], mobileApp);
 ```
 
 ### ❌ 错误的使用方式
 
 ```typescript
+// ❌ 错误：试图通过静态方式管理（已移除的反模式）
+// 这些全局函数已被移除，请使用服务化方式
+// const rootInjector = getRootInjector(); // ❌ 不存在
+// const platformInjector = getPlatformInjector(); // ❌ 不存在
+
 // ❌ 错误：没有先创建根注入器
 const platformInjector = createPlatformInjector();
 // Error: Root injector not found!
 
-// ❌ 错误：重复创建根注入器
-createRootInjector();
-createRootInjector();
-// Error: Root injector already exists!
+// ❌ 错误：不使用服务管理器直接创建重复注入器
+const injectorRegistry1 = new InjectorRegistry(); // ❌ 应该通过DI获取
+const injectorRegistry2 = new InjectorRegistry(); // ❌ 违反了服务单例原则
 
-// ❌ 错误：重复创建平台注入器
-createRootInjector();
-createPlatformInjector();
-createPlatformInjector();
-// Error: Platform injector already exists!
-
-// ❌ 错误：没有平台注入器就创建应用注入器
-createRootInjector();
-// 没有创建平台注入器
-const appInjector = createApplicationInjector();
-// Error: Platform injector not found!
+// ✅ 正确：通过DI获取服务
+const rootInjector = createInjector([]);
+const injectorRegistry = rootInjector.get(INJECTOR_REGISTRY); // ✅ 单例服务
 ```
 
 ### 服务获取示例
@@ -173,27 +228,47 @@ const logger2 = appInjector.get(PlatformLoggerService);
 console.log(logger1 === logger2); // true - 平台服务在所有子注入器中共享
 ```
 
-## ✅ 设计优势
+## ✅ 服务化架构优势
 
-### 1. **职责清晰**
-- 每个注入器只负责自己作用域的服务
+### 🚀 1. **一切皆服务原则**
+- 所有系统组件都实现为可注入服务
+- 消除静态单例模式和全局变量
+- 通过依赖注入实现松耦合
+
+### 🔗 2. **一切皆可注入原则**
+- 任何组件都可以通过DI获取依赖
+- 完整的依赖注入体系覆盖所有层级
+- 支持任意深度的服务嵌套注入
+
+### 3. **职责清晰**
+- 每个服务有明确的职责边界
+- 通过服务接口定义契约
 - 避免了作用域混乱和语义不清
 
-### 2. **层次继承**
+### 4. **层次继承**
 - 通过自然的父子关系实现服务继承
 - 符合直觉的查找顺序
+- 服务管理器控制生命周期
 
-### 3. **灵活组合**
-- 可以根据需要组合不同的注入器层次
-- 支持复杂的应用架构
+### 5. **灵活组合**
+- 可以根据需要组合不同的服务层次
+- 支持复杂的企业级应用架构
+- 动态服务发现和注册
 
-### 4. **性能优化**
-- 服务在合适的层级实例化
+### 6. **性能优化**
+- 服务在合适的层级实例化并缓存
 - 避免不必要的重复创建
+- 延迟加载和智能销毁机制
 
-### 5. **易于测试**
-- 每个层级可以独立测试
-- 清晰的依赖关系
+### 7. **易于测试**
+- 每个服务可以独立测试
+- 清晰的依赖关系便于Mock
+- 完整的测试覆盖率支持
+
+### 8. **类型安全**
+- 完整的TypeScript类型推断
+- 编译期依赖关系检查
+- 运行时类型验证
 
 ## 🔒 严格的层次结构控制
 
