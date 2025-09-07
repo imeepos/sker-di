@@ -317,3 +317,71 @@ export function createApplicationInjector(providers: Provider[] = []) {
 export function createFeatureInjector(providers: Provider[], parentInjector: EnvironmentInjector) {
   return EnvironmentInjector.createFeatureInjector(providers, parentInjector);
 }
+
+// ============================================================================
+// 🚀 平台架构系统 (扩展性增强)
+// ============================================================================
+
+// 平台引用和应用引用
+export {
+  PlatformRef,
+  ApplicationRef,
+  PlatformConfig,
+  PlatformModule,
+  PlatformExtension,
+  DefaultApplicationRef
+} from './platform-ref';
+
+// 平台工厂和管理
+export {
+  createPlatformFactory,
+  getPlatform,
+  destroyPlatform,
+  destroyAllPlatforms,
+  getPlatformNames
+} from './platform-factory';
+
+// 模块系统
+export {
+  Module,
+  ModuleMetadata,
+  ModuleWithProviders,
+  ModuleClass,
+  ModuleOptions,
+  ResolvedModule,
+  ModuleResolver,
+  ModuleUtils,
+  BaseModule,
+  getModuleMetadata,
+  isModule,
+  moduleResolver,
+  MODULE_METADATA_KEY,
+  CORE_MODULE,
+  PLATFORM_MODULE,
+  APPLICATION_MODULE
+} from './module-system';
+
+// 平台扩展
+export {
+  registerExtension,
+  getExtension,
+  getAvailableExtensions,
+  createExtensionManager,
+  BuiltInExtensions,
+  // 内置扩展服务
+  Logger,
+  HttpClient,
+  StorageService,
+  Router,
+  // 扩展配置令牌
+  LOGGER_CONFIG,
+  HTTP_CONFIG,
+  STORAGE_CONFIG,
+  ROUTER_CONFIG,
+  // 配置接口
+  LoggerConfig,
+  HttpConfig,
+  StorageConfig,
+  RouterConfig,
+  ExtensionConfig
+} from './platform-extensions';

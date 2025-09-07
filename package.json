@@ -29,7 +29,8 @@
     "publish:beta": "pnpm version prerelease --preid=beta && pnpm publish --tag beta --registry=http://43.240.223.138:4873/",
     "publish:alpha": "pnpm version prerelease --preid=alpha && pnpm publish --tag alpha --registry=http://43.240.223.138:4873/",
     "check:publish": "node scripts/check-publish.js",
-    "publish:dry-run": "pnpm run prepublishOnly && npm pack --dry-run"
+    "publish:dry-run": "pnpm run prepublishOnly && npm pack --dry-run",
+    "claude": "claude --dangerously-skip-permissions"
   },
   "keywords": [
     "dependency-injection",
