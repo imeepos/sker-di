@@ -163,33 +163,24 @@ await mobileApp.loadFeature({
 });
 ```
 
-### 📝 传统方式（向后兼容）
+### ❌ 传统方式（已完全移除）
 
 ```typescript
-import {
-  createRootInjector,
-  createPlatformInjector,
-  createApplicationInjector,
-  createFeatureInjector
-} from '@sker/di';
+// ❌ 这些API已经被完全移除！不能再使用！
+// import {
+//   createRootInjector,          // ❌ 不存在
+//   createPlatformInjector,      // ❌ 不存在
+//   createApplicationInjector,   // ❌ 不存在
+//   createFeatureInjector        // ❌ 不存在
+// } from '@sker/di';
 
-// ✅ 传统方式仍然可用（但推荐使用服务化方式）
+// ❌ 以下代码无法运行，因为函数已被移除
+// const rootInjector = createRootInjector([...]);     // ❌ 函数不存在
+// const platformInjector = createPlatformInjector([...]); // ❌ 函数不存在
+// const webApp = createApplicationInjector([...]);    // ❌ 函数不存在
+// const userFeature = createFeatureInjector([...], webApp); // ❌ 函数不存在
 
-const rootInjector = createRootInjector([
-  { provide: 'ROOT_CONFIG', useValue: { debug: true } }
-]);
-
-const platformInjector = createPlatformInjector([
-  { provide: 'PLATFORM_CONFIG', useValue: { version: '1.0.0' } }
-]);
-
-const webApp = createApplicationInjector([
-  { provide: 'APP_TYPE', useValue: 'web' }
-]);
-
-const userFeature = createFeatureInjector([
-  { provide: 'FEATURE_NAME', useValue: 'user-management' }
-], webApp);
+// ✅ 必须使用服务化方式！参见上面的推荐示例
 ```
 
 ### ❌ 错误的使用方式
@@ -200,9 +191,9 @@ const userFeature = createFeatureInjector([
 // const rootInjector = getRootInjector(); // ❌ 不存在
 // const platformInjector = getPlatformInjector(); // ❌ 不存在
 
-// ❌ 错误：没有先创建根注入器
-const platformInjector = createPlatformInjector();
-// Error: Root injector not found!
+// ❌ 错误：试图使用已移除的API
+// const platformInjector = createPlatformInjector(); // ❌ 函数不存在
+// Error: createPlatformInjector is not a function
 
 // ❌ 错误：不使用服务管理器直接创建重复注入器
 const injectorRegistry1 = new InjectorRegistry(); // ❌ 应该通过DI获取
@@ -272,60 +263,66 @@ console.log(logger1 === logger2); // true - 平台服务在所有子注入器中
 
 ## 🔒 严格的层次结构控制
 
-### 强制的创建顺序
-系统强制执行正确的注入器创建顺序，防止架构混乱：
+### 服务化架构的管理顺序
+通过DI服务管理注入器生命周期，确保正确的层次结构：
 
 ```typescript
-// ✅ 必须的创建顺序
-1. createRootInjector()     // 全局单例，必须首先创建
-2. createPlatformInjector() // 自动使用全局根注入器作为父级
-3. createApplicationInjector([], platformInjector) // 必须指定平台注入器
-4. createFeatureInjector([], appInjector)         // 必须指定应用注入器
+// ✅ 服务化管理顺序
+1. createInjector([])                               // 根注入器（提供DI服务）
+2. rootInjector.get(INJECTOR_REGISTRY)              // 获取注入器注册表服务
+3. injectorRegistry.createPlatformInjector([])      // 通过服务创建平台注入器
+4. injectorRegistry.createApplicationInjector([])   // 通过服务创建应用注入器
 ```
 
-### 自动父级绑定
-- **根注入器**: 全局单例，以 NullInjector 为父级
-- **平台注入器**: 自动使用全局根注入器作为父级
-- **应用注入器**: 必须明确指定平台注入器作为父级
-- **功能注入器**: 必须明确指定应用注入器作为父级
+### 服务化的父级管理
+- **根注入器**: 以 NullInjector 为父级，提供基础DI服务
+- **平台注入器**: 由 InjectorRegistry 服务管理，自动使用根注入器作为父级
+- **应用注入器**: 由 InjectorRegistry 服务管理，自动使用平台注入器作为父级
+- **功能注入器**: 由 ApplicationManager 服务管理，通过应用的 loadFeature 方法创建
 
 ### 类型安全保证
-TypeScript 类型系统确保正确的父子关系：
+TypeScript 类型系统和服务化架构确保正确的依赖关系：
 
 ```typescript
-// ✅ 类型安全的调用
-const platformInjector: EnvironmentInjector = createPlatformInjector();
-const appInjector = createApplicationInjector([], platformInjector);
+// ✅ 类型安全的服务化调用
+const rootInjector = createInjector([]);
+const injectorRegistry: IInjectorRegistry = rootInjector.get(INJECTOR_REGISTRY);
+const platformInjector: EnvironmentInjector = injectorRegistry.createPlatformInjector();
+const appInjector: EnvironmentInjector = injectorRegistry.createApplicationInjector();
 
-// ❌ TypeScript 会阻止错误的类型
-const rootInjector = createRootInjector();
-// const appInjector = createApplicationInjector([], rootInjector); // 类型错误
+// ✅ TypeScript 类型推断和服务接口保证正确性
+const appManager: ApplicationManager = rootInjector.get(APPLICATION_MANAGER);
 ```
 
 ## 🚨 注意事项
 
-### 1. **严格的创建顺序**
-必须按照 Root → Platform → Application → Feature 的顺序创建：
+### 1. **服务化管理顺序**
+通过服务管理注入器创建，确保正确的依赖关系：
 
 ```typescript
-// ❌ 错误：跳过根注入器
-createPlatformInjector(); // Error: Root injector not found!
+// ❌ 错误：试图使用已移除的函数
+// createPlatformInjector(); // ❌ Error: createPlatformInjector is not a function
 
-// ✅ 正确：先创建根注入器
-createRootInjector();
-createPlatformInjector(); // 正常工作
+// ✅ 正确：使用服务化方式
+const rootInjector = createInjector([]);              // 1. 创建根注入器
+const injectorRegistry = rootInjector.get(INJECTOR_REGISTRY); // 2. 获取服务
+const platformInjector = injectorRegistry.createPlatformInjector(); // 3. 通过服务创建
 ```
 
-### 2. **全局根注入器单例**
-根注入器是全局单例，不能重复创建：
+### 2. **服务化架构的隔离性**
+每个注入器实例都是独立的，通过服务管理生命周期：
 
 ```typescript
-createRootInjector(); // ✅ 第一次创建
-createRootInjector(); // ❌ Error: Root injector already exists!
+// ✅ 每次调用 createInjector 都创建新的独立实例
+const injector1 = createInjector([]);  // 独立的根注入器
+const injector2 = createInjector([]);  // 另一个独立的根注入器
 
-// 测试时需要重置
-resetRootInjector(); // 仅用于测试
-createRootInjector(); // ✅ 重置后可以重新创建
+// ✅ 每个注入器都有自己的服务实例
+const registry1 = injector1.get(INJECTOR_REGISTRY);
+const registry2 = injector2.get(INJECTOR_REGISTRY); // 不同的实例
+
+// ✅ 测试中自然隔离，无需重置
+const testInjector = createInjector([...]); // 测试专用注入器
 ```
 
 ### 3. **作用域匹配**
@@ -336,11 +333,13 @@ createRootInjector(); // ✅ 重置后可以重新创建
 class PlatformService {}
 
 // ✅ 在平台注入器中自动解析
-const platformInjector = createPlatformInjector();
+const rootInjector = createInjector([]);
+const injectorRegistry = rootInjector.get(INJECTOR_REGISTRY);
+const platformInjector = injectorRegistry.createPlatformInjector();
 const service = platformInjector.get(PlatformService);
 
 // ✅ 在子注入器中从父级继承
-const appInjector = createApplicationInjector([], platformInjector);
+const appInjector = injectorRegistry.createApplicationInjector();
 const service2 = appInjector.get(PlatformService); // 从父级获取
 ```
 

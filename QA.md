@@ -1,10 +1,12 @@
 # SKER-DI 知识库 QA 文档
 
+🚀 **一切皆服务，一切皆可注入！**
+
 ## 🎯 基础概念
 
 ### 什么是 SKER-DI？
 
-SKER-DI 是一个基于 TypeScript 的轻量级依赖注入框架，提供了完整的依赖注入解决方案，支持多层级注入器架构、自动服务解析、调试工具等企业级特性！
+SKER-DI 是一个基于"一切皆服务，一切皆可注入"理念的 TypeScript 依赖注入框架，完全消除静态单例模式，提供了企业级的服务化依赖注入解决方案，支持多层级注入器架构、自动服务解析、调试工具等特性！
 
 ```typescript
 import { createInjector, Injectable, Inject } from '@sker/di';
@@ -21,10 +23,10 @@ console.log(userService.getUser()); // { name: 'John', id: 1 }
 
 ### 支持哪些注入器作用域？
 
-SKER-DI 支持五种注入器作用域：`root`、`platform`、`application`、`feature`、`auto`，形成完整的层次结构！
+SKER-DI 支持五种注入器作用域：`root`、`platform`、`application`、`feature`、`auto`，形成完整的层次结构！现在所有管理功能都通过DI服务实现！
 
 ```typescript
-import { createRootInjector, createPlatformInjector, createApplicationInjector, Injectable } from '@sker/di';
+import { createInjector, Injectable, INJECTOR_REGISTRY } from '@sker/di';
 
 @Injectable({ providedIn: 'root' })
 class RootService { getValue() { return 'root-level'; } }
@@ -35,10 +37,15 @@ class PlatformService { getValue() { return 'platform-level'; } }
 @Injectable({ providedIn: 'application' })
 class AppService { getValue() { return 'app-level'; } }
 
-// 创建层次结构
-const rootInjector = createRootInjector();
-const platformInjector = createPlatformInjector();
-const appInjector = createApplicationInjector();
+// 🚀 服务化架构：通过DI服务管理层次结构
+const rootInjector = createInjector([]); // 提供基础DI服务
+
+// 获取注入器注册表服务 - 一切皆服务！
+const injectorRegistry = rootInjector.get(INJECTOR_REGISTRY);
+
+// 通过服务管理注入器生命周期 - 消除静态管理！
+const platformInjector = injectorRegistry.createPlatformInjector();
+const appInjector = injectorRegistry.createApplicationInjector();
 
 // 服务会在对应作用域自动注册
 const rootService = appInjector.get(RootService); // 从根注入器获取
@@ -298,7 +305,7 @@ console.log(getPlatform()); // null
 模块系统提供了组织和复用依赖配置的机制！
 
 ```typescript
-import { Module, Injectable, createApplicationInjector, moduleResolver } from '@sker/di';
+import { Module, Injectable, createInjector, moduleResolver, INJECTOR_REGISTRY } from '@sker/di';
 
 @Injectable({ providedIn: 'application' })
 class UserService {
@@ -335,7 +342,10 @@ const resolvedModule = moduleResolver.resolve(UserModule);
 // 从解析的模块中获取提供者
 const allProviders = resolvedModule.providers;
 
-const appInjector = createApplicationInjector(allProviders);
+// 🚀 使用服务化方式创建应用注入器
+const rootInjector = createInjector([]);
+const injectorRegistry = rootInjector.get(INJECTOR_REGISTRY);
+const appInjector = injectorRegistry.createApplicationInjector(allProviders);
 const userService = appInjector.get(UserService);
 const apiUrl = appInjector.get('API_BASE_URL'); // 从 CoreModule 导出
 ```
@@ -585,15 +595,14 @@ console.log('- 实例总数:', debugInfo.metrics.totalInstancesCreated);
 
 ### 如何组织大型应用的依赖注入？
 
-推荐使用分层注入器架构来组织复杂应用！
+推荐使用服务化的分层注入器架构来组织复杂应用！
 
 ```typescript
 import { 
-  createRootInjector, 
-  createPlatformInjector, 
-  createApplicationInjector,
-  createFeatureInjector,
-  Injectable 
+  createInjector,
+  Injectable,
+  INJECTOR_REGISTRY,
+  APPLICATION_MANAGER
 } from '@sker/di';
 
 // 1. 基础层服务 (Root)
@@ -625,30 +634,38 @@ class UserFeatureService {
   }
 }
 
-// 创建分层架构
+// 🚀 服务化架构创建分层结构
 async function setupApplication() {
-  // 创建基础层
-  const rootInjector = createRootInjector([
+  // 创建根注入器（提供基础DI服务）
+  const rootInjector = createInjector([
     { provide: 'ROOT_CONFIG', useValue: { debug: true } }
   ]);
   
-  // 创建平台层
-  const platformInjector = createPlatformInjector([
+  // 获取服务管理器
+  const injectorRegistry = rootInjector.get(INJECTOR_REGISTRY);
+  const appManager = rootInjector.get(APPLICATION_MANAGER);
+  
+  // 通过服务创建平台层
+  const platformInjector = injectorRegistry.createPlatformInjector([
     { provide: 'PLATFORM_CONFIG', useValue: { env: 'production' } }
   ]);
   
-  // 创建应用层
-  const appInjector = createApplicationInjector([
+  // 通过服务创建应用
+  const myApp = await appManager.createApplication('my-app', [
     { provide: 'APP_CONFIG', useValue: { theme: 'dark' } }
   ]);
   
-  // 创建功能模块层
-  const userFeatureInjector = createFeatureInjector([
-    { provide: 'USER_CONFIG', useValue: { pageSize: 10 } }
-  ], appInjector);
+  // 通过应用加载功能模块
+  await myApp.loadFeature({
+    name: 'user-feature',
+    providers: [
+      { provide: 'USER_CONFIG', useValue: { pageSize: 10 } }
+    ]
+  });
   
-  // 使用服务
-  const userService = userFeatureInjector.get(UserFeatureService);
+  // 获取功能服务
+  const userFeatureRef = myApp.getFeatureRef('user-feature');
+  const userService = userFeatureRef!.injector.get(UserFeatureService);
   const userData = userService.getUserData();
   
   console.log('用户数据:', userData);
@@ -662,7 +679,7 @@ setupApplication();
 SKER-DI 提供了完善的测试支持，包括模拟注入器和服务替换！
 
 ```typescript
-import { createInjector, Injectable, resetRootInjector } from '@sker/di';
+import { createInjector, Injectable, INJECTOR_REGISTRY } from '@sker/di';
 
 @Injectable({ providedIn: 'root' })
 class DatabaseService {
@@ -688,14 +705,11 @@ describe('UserService', () => {
   let mockDbService: jasmine.SpyObj<DatabaseService>;
   
   beforeEach(() => {
-    // 重置根注入器（测试隔离）
-    resetRootInjector();
-    
     // 创建模拟服务
     mockDbService = jasmine.createSpyObj('DatabaseService', ['getData']);
     mockDbService.getData.and.returnValue(Promise.resolve(['mockData']));
     
-    // 创建测试注入器
+    // 🚀 创建独立的测试注入器（自动隔离）
     const testInjector = createInjector([
       { provide: DatabaseService, useValue: mockDbService },
       { provide: UserService, useClass: UserService }
@@ -894,20 +908,21 @@ export class DataService {
 
 #### 3. 注入器层次结构错误
 
-**❌ 错误写法：**
+**❌ 错误写法（旧API，已移除）：**
 ```typescript
-// 没有正确建立父子关系
-const rootInjector = createRootInjector();
-const platformInjector = createPlatformInjector(); // 没有设置父级
-const appInjector = createApplicationInjector();   // 父级关系混乱
+// ❌ 这些函数已经被移除！
+// const rootInjector = createRootInjector();
+// const platformInjector = createPlatformInjector();
+// const appInjector = createApplicationInjector();
 ```
 
-**✅ 正确写法：**
+**✅ 正确写法（服务化架构）：**
 ```typescript
-// 按正确顺序创建，自动建立层次结构
-const rootInjector = createRootInjector();        // 1. 先创建根注入器
-const platformInjector = createPlatformInjector(); // 2. 自动使用根注入器作为父级
-const appInjector = createApplicationInjector();   // 3. 自动使用平台注入器作为父级
+// 🚀 使用服务化方式建立层次结构
+const rootInjector = createInjector([]);           // 1. 创建根注入器（提供DI服务）
+const injectorRegistry = rootInjector.get(INJECTOR_REGISTRY); // 2. 获取注入器注册表服务
+const platformInjector = injectorRegistry.createPlatformInjector(); // 3. 通过服务创建平台注入器
+const appInjector = injectorRegistry.createApplicationInjector();    // 4. 通过服务创建应用注入器
 ```
 
 ### No provider for Service 错误
@@ -926,24 +941,27 @@ NullInjector: No provider for PlatformCacheService
 class PlatformService {}
 
 // 在错误的注入器中查找
-const rootInjector = createRootInjector();
+const rootInjector = createInjector([]); // 只提供根级服务
 const service = rootInjector.get(PlatformService); // ❌ 根注入器找不到平台服务
 
 // ✅ 正确的查找方式
-const platformInjector = createPlatformInjector();
+const rootInjector = createInjector([]);
+const injectorRegistry = rootInjector.get(INJECTOR_REGISTRY);
+const platformInjector = injectorRegistry.createPlatformInjector();
 const service = platformInjector.get(PlatformService); // ✅ 在正确的注入器中查找
 ```
 
-#### 2. 注入器创建顺序错误
+#### 2. 服务化架构的正确使用顺序
 ```typescript
-// ❌ 错误顺序
-const appInjector = createApplicationInjector();    // 找不到平台注入器
-const platformInjector = createPlatformInjector();  // 太晚了
+// ❌ 错误：试图使用已移除的API
+// const appInjector = createApplicationInjector();  // ❌ 函数已移除
+// const platformInjector = createPlatformInjector(); // ❌ 函数已移除
 
-// ✅ 正确顺序  
-const rootInjector = createRootInjector();          // 1. 根
-const platformInjector = createPlatformInjector();  // 2. 平台
-const appInjector = createApplicationInjector();    // 3. 应用
+// ✅ 正确：使用服务化方式  
+const rootInjector = createInjector([]);                    // 1. 根注入器（提供DI服务）
+const injectorRegistry = rootInjector.get(INJECTOR_REGISTRY); // 2. 获取服务
+const platformInjector = injectorRegistry.createPlatformInjector(); // 3. 通过服务创建
+const appInjector = injectorRegistry.createApplicationInjector();    // 4. 通过服务创建
 ```
 
 ### 循环依赖检测错误
@@ -980,7 +998,7 @@ class ServiceB {
 **注入器创建：**
 - [ ] 按正确顺序创建注入器：Root → Platform → Application → Feature
 - [ ] 验证注入器父子关系是否正确
-- [ ] 在测试中使用 `resetRootInjector()` 确保隔离
+- [ ] 在测试中创建独立注入器确保隔离
 
 **错误处理：**
 - [ ] 可选依赖使用 `@Optional()` 装饰器
@@ -1031,6 +1049,209 @@ getDebugger().getDebugInfo()          # 获取调试信息和性能指标
 getDebugger().getDebugInfo().metrics  # 获取性能指标
 ```
 
+## 🚀 服务化架构专题 FAQ
+
+### 什么是"一切皆服务，一切皆可注入"？
+
+SKER-DI 的核心理念是将所有系统组件都实现为可注入服务，完全消除静态单例模式：
+
+```typescript
+import { createInjector, INJECTOR_REGISTRY, PLATFORM_MANAGER, APPLICATION_MANAGER } from '@sker/di';
+
+// 🚀 一切皆服务：所有管理组件都是服务
+const rootInjector = createInjector([]);
+
+// 注入器注册表服务 - 管理注入器生命周期
+const injectorRegistry = rootInjector.get(INJECTOR_REGISTRY);
+
+// 平台管理器服务 - 管理平台实例  
+const platformManager = rootInjector.get(PLATFORM_MANAGER);
+
+// 应用管理器服务 - 管理应用实例
+const appManager = rootInjector.get(APPLICATION_MANAGER);
+
+// 🔗 一切皆可注入：任何服务都可以注入任何依赖
+```
+
+### 为什么要消除静态单例模式？
+
+静态单例模式有诸多问题，服务化架构提供了更好的解决方案：
+
+**❌ 静态单例的问题：**
+- 难以测试（无法Mock）
+- 隐式依赖（难以追踪）
+- 生命周期管理困难
+- 无法进行依赖注入
+- 违反单一职责原则
+
+**✅ 服务化架构的优势：**
+```typescript
+// 传统静态单例（已移除）
+// class GlobalPlatform {
+//   private static instance: GlobalPlatform;
+//   static getInstance() { return this.instance; }
+// }
+
+// 🚀 服务化架构
+@Injectable({ providedIn: 'root' })
+class PlatformManager implements IPlatformManager {
+  getCurrentPlatform(): PlatformRef | null { /* 实现 */ }
+  setPlatform(platform: PlatformRef): void { /* 实现 */ }
+  // 可测试、可注入、生命周期可控
+}
+```
+
+### 如何使用服务化的管理器？
+
+所有管理功能都通过DI服务提供，支持完整的依赖注入：
+
+```typescript
+import { createInjector, INJECTOR_REGISTRY, APPLICATION_MANAGER } from '@sker/di';
+
+// 创建根注入器（提供基础DI服务）
+const rootInjector = createInjector([
+  { provide: 'GLOBAL_CONFIG', useValue: { debug: true } }
+]);
+
+// 🚀 通过DI获取服务 - 一切皆可注入
+const injectorRegistry = rootInjector.get(INJECTOR_REGISTRY);
+const appManager = rootInjector.get(APPLICATION_MANAGER);
+
+// 🚀 通过服务管理应用生命周期 - 一切皆服务
+const myApp = await appManager.createApplication('my-app', [
+  { provide: 'APP_NAME', useValue: 'MyApplication' }
+]);
+
+// 🚀 功能也是服务
+await myApp.loadFeature({
+  name: 'user-module',
+  providers: [
+    { provide: 'USER_CONFIG', useValue: { pageSize: 10 } }
+  ]
+});
+```
+
+### 如何在服务中注入其他管理服务？
+
+所有管理服务都可以相互注入，形成完整的服务网络：
+
+```typescript
+@Injectable({ providedIn: 'root' })
+class CustomService {
+  constructor(
+    @Inject(INJECTOR_REGISTRY) private injectorRegistry: IInjectorRegistry,
+    @Inject(PLATFORM_MANAGER) private platformManager: IPlatformManager,
+    @Inject(DI_DEBUGGER) private debugger: IDIDebugger
+  ) {}
+
+  async setupApplication() {
+    // 🚀 通过注入的服务管理整个系统
+    const platformInjector = this.injectorRegistry.createPlatformInjector();
+    const platform = this.platformManager.getCurrentPlatform();
+    
+    this.debugger.logEvent({
+      type: DebugEventType.PlatformEvent,
+      metadata: { action: 'setupApplication' }
+    });
+  }
+}
+
+// 使用自定义服务
+const rootInjector = createInjector([]);
+const customService = rootInjector.get(CustomService);
+await customService.setupApplication();
+```
+
+### 传统的全局函数还能使用吗？
+
+**不能！** 传统的全局函数已经被完全移除，必须使用服务化方式：
+
+```typescript
+// ❌ 传统方式（这些API已被移除！）
+// import { createRootInjector, createPlatformInjector } from '@sker/di';
+// const rootInjector = createRootInjector();  // ❌ 函数不存在
+// const platformInjector = createPlatformInjector(); // ❌ 函数不存在
+
+// 🚀 推荐方式（服务化架构）
+import { createInjector, INJECTOR_REGISTRY } from '@sker/di';
+const rootInjector = createInjector([]);
+const injectorRegistry = rootInjector.get(INJECTOR_REGISTRY);
+const platformInjector = injectorRegistry.createPlatformInjector();
+```
+
+### 服务化架构对测试有什么好处？
+
+服务化架构让测试变得更加简单和灵活：
+
+```typescript
+describe('CustomService', () => {
+  let customService: CustomService;
+  let mockInjectorRegistry: jasmine.SpyObj<IInjectorRegistry>;
+  let mockPlatformManager: jasmine.SpyObj<IPlatformManager>;
+
+  beforeEach(() => {
+    // 🚀 所有服务都可以轻松Mock
+    mockInjectorRegistry = jasmine.createSpyObj('InjectorRegistry', ['createPlatformInjector']);
+    mockPlatformManager = jasmine.createSpyObj('PlatformManager', ['getCurrentPlatform']);
+
+    const testInjector = createInjector([
+      { provide: INJECTOR_REGISTRY, useValue: mockInjectorRegistry },
+      { provide: PLATFORM_MANAGER, useValue: mockPlatformManager },
+      { provide: CustomService, useClass: CustomService }
+    ]);
+
+    customService = testInjector.get(CustomService);
+  });
+
+  it('应该正确设置应用', async () => {
+    await customService.setupApplication();
+    
+    expect(mockInjectorRegistry.createPlatformInjector).toHaveBeenCalled();
+    expect(mockPlatformManager.getCurrentPlatform).toHaveBeenCalled();
+  });
+});
+```
+
+### 如何迁移现有代码到服务化架构？
+
+迁移策略建议采用渐进式方式：
+
+**第1步：引入服务化管理器**
+```typescript
+// ❌ 替换已移除的静态调用
+// const rootInjector = getRootInjector(); // ❌ 函数已移除
+// const platformInjector = createPlatformInjector(); // ❌ 函数已移除
+
+// ✅ 使用服务化方式
+const rootInjector = createInjector([]);
+const injectorRegistry = rootInjector.get(INJECTOR_REGISTRY);
+const platformInjector = injectorRegistry.createPlatformInjector();
+```
+
+**第2步：重构业务服务**
+```typescript
+// 将静态管理逻辑移入服务
+@Injectable({ providedIn: 'root' })
+class LegacyMigrationService {
+  constructor(
+    @Inject(INJECTOR_REGISTRY) private injectorRegistry: IInjectorRegistry
+  ) {}
+
+  // 逐步迁移原有功能
+  migrateToServiceArchitecture() {
+    // 原有逻辑服务化
+  }
+}
+```
+
+**第3步：更新测试**
+```typescript
+// 使用新的服务化测试模式
+const testInjector = createInjector([
+  { provide: INJECTOR_REGISTRY, useValue: mockRegistry }
+]);
+```
+
 ---
 
-🎉 **恭喜！** 您已经掌握了 SKER-DI 的核心功能和最佳实践。通过遵循这些经验教训，您能够避免常见的依赖注入陷阱，构建更加稳定可靠的 TypeScript 应用程序！
+🎉 **恭喜！** 您已经掌握了 SKER-DI 的服务化架构理念和最佳实践。通过"一切皆服务，一切皆可注入"的设计原则，您能够构建更加灵活、可测试、可维护的 TypeScript 应用程序！
