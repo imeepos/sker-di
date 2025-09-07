@@ -1,6 +1,6 @@
-import { Injector, InjectionTokenType } from './injector';
+import { Injector, InjectionTokenType, Type } from './injector';
 import { NullInjector } from './null-injector';
-import { Provider } from './provider';
+import { Provider, ValueProvider, ClassProvider, FactoryProvider, ExistingProvider, ConstructorProvider } from './provider';
 import { getInjectableMetadata, InjectorScope } from './injectable';
 import { getInjectMetadata, getInjectOptionsMetadata } from './inject';
 import { InjectOptions } from './inject-options';
@@ -19,6 +19,9 @@ import {
   InstanceDebugInfo
 } from './debug';
 import { EnvironmentInjectorUtils } from './environment-injector-utils';
+
+// 类型别名：不包含直接Type<T>的Provider联合类型
+type NormalizedProvider = ValueProvider<any> | ClassProvider<any> | FactoryProvider<any> | ExistingProvider<any> | ConstructorProvider<any>;
 
 /**
  * 环境注入器，提供全局作用域的依赖管理
@@ -325,23 +328,36 @@ export class EnvironmentInjector extends Injector {
    */
   private setupProviders(providers: Provider[]): void {
     providers.forEach(provider => {
+      let normalizedProvider: NormalizedProvider;
+      let token: any;
+      
+      // 自动转换 Type<T> 为 ConstructorProvider<T>
+      if (EnvironmentInjectorUtils.isDirectType(provider)) {
+        normalizedProvider = EnvironmentInjectorUtils.convertTypeToConstructorProvider(provider);
+        token = provider;
+      } else {
+        // 现在可以安全地假设这不是 Type<T>
+        normalizedProvider = provider as NormalizedProvider;
+        token = normalizedProvider.provide;
+      }
+
       // 调试日志：注册提供者
       this.debugger.logEvent({
         type: DebugEventType.ProviderRegistered,
         injectorId: this.injectorId,
-        token: provider.provide,
-        tokenName: this.getTokenName(provider.provide),
-        provider: provider,
+        token: token,
+        tokenName: this.getTokenName(token),
+        provider: normalizedProvider,
         metadata: {
-          isMulti: provider.multi || false,
-          isLazy: false
+          isMulti: normalizedProvider.multi || false,
+          isLazy: false,
+          wasAutoConverted: EnvironmentInjectorUtils.isDirectType(provider)
         }
       });
 
-
       // 处理普通提供者
-      const existing = this.providers.get(provider.provide) || [];
-      this.providers.set(provider.provide, [...existing, provider]);
+      const existing = this.providers.get(token) || [];
+      this.providers.set(token, [...existing, normalizedProvider]);
     });
 
     // 更新调试信息
@@ -364,28 +380,36 @@ export class EnvironmentInjector extends Injector {
    * 根据单个提供者创建实例
    */
   private createSingleInstance<T>(provider: Provider): T {
-    if ('useValue' in provider) {
-      return provider.useValue;
+    // 处理直接的 Type<T>（双重保险，虽然在setupProviders中已经转换了）
+    if (EnvironmentInjectorUtils.isDirectType(provider)) {
+      return this.createInstanceWithDI(provider as Type<T>);
     }
 
-    if ('useClass' in provider) {
-      const resolvedClass = resolveForwardRefCached(provider.useClass);
+    // 现在可以安全地假设 provider 不是 Type<T>
+    const normalizedProvider = provider as NormalizedProvider;
+
+    if ('useValue' in normalizedProvider) {
+      return normalizedProvider.useValue;
+    }
+
+    if ('useClass' in normalizedProvider) {
+      const resolvedClass = resolveForwardRefCached(normalizedProvider.useClass);
       return this.createInstanceWithDI(resolvedClass);
     }
 
-    if ('useFactory' in provider) {
-      const resolvedDeps = resolveForwardRefsInDeps(provider.deps);
+    if ('useFactory' in normalizedProvider) {
+      const resolvedDeps = resolveForwardRefsInDeps(normalizedProvider.deps);
       const deps = (resolvedDeps || []).map(dep => this.get(dep));
-      return provider.useFactory(...deps);
+      return normalizedProvider.useFactory(...deps);
     }
 
-    if ('useExisting' in provider) {
-      const resolvedExisting = resolveForwardRefCached(provider.useExisting);
+    if ('useExisting' in normalizedProvider) {
+      const resolvedExisting = resolveForwardRefCached(normalizedProvider.useExisting);
       return this.get(resolvedExisting);
     }
 
     // ConstructorProvider
-    return this.createInstanceWithDI(provider.provide as any);
+    return this.createInstanceWithDI(normalizedProvider.provide as any);
   }
 
   /**

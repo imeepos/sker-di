@@ -13,7 +13,7 @@ export interface Type<T> extends Function {
  * abstract 类
  */
 export interface AbstractType<T> extends Function {
-
+  prototype: T;
 }
 export type StringToken<T> = string & { __type?: T }
 export type SymbolToken<T> = symbol & { __type?: T }

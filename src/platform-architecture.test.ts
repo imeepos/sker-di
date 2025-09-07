@@ -130,11 +130,11 @@ describe('Platform Architecture 扩展性测试', () => {
 
       expect(rootModule.ngModule).toBe(UserModule);
       expect(rootModule.providers.some(p => 
-        p.provide === 'ROOT_CONFIG' && ('useValue' in p) && p.useValue?.isRoot
+        ('provide' in p) && p.provide === 'ROOT_CONFIG' && ('useValue' in p) && p.useValue?.isRoot
       )).toBe(true);
 
       expect(childModule.providers.some(p => 
-        p.provide === 'CHILD_CONFIG' && ('useValue' in p) && p.useValue?.isChild
+        ('provide' in p) && p.provide === 'CHILD_CONFIG' && ('useValue' in p) && p.useValue?.isChild
       )).toBe(true);
     });
 

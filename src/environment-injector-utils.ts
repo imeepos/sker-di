@@ -1,4 +1,4 @@
-import { Provider } from './provider';
+import { Provider, Type } from './provider';
 import { ProviderDebugInfo, InstanceDebugInfo } from './debug';
 
 /**
@@ -45,9 +45,34 @@ export class EnvironmentInjectorUtils {
   }
 
   /**
+   * 判断Provider是否为直接的Type<T>
+   */
+  static isDirectType<T>(provider: Provider<T>): provider is Type<T> {
+    return typeof provider === 'function' && 
+           !('provide' in provider) && 
+           !('useValue' in provider) && 
+           !('useClass' in provider) && 
+           !('useFactory' in provider) && 
+           !('useExisting' in provider);
+  }
+
+  /**
+   * 将Type<T>转换为ConstructorProvider<T>
+   */
+  static convertTypeToConstructorProvider<T>(type: Type<T>): import('./provider').ConstructorProvider<T> {
+    return {
+      provide: type,
+      multi: false
+    };
+  }
+
+  /**
    * 获取提供者类型
    */
   static getProviderType(provider: Provider): string {
+    if (EnvironmentInjectorUtils.isDirectType(provider)) {
+      return 'Type (auto-converted to ConstructorProvider)';
+    }
     if ('useValue' in provider) {
       return 'ValueProvider';
     }
@@ -67,7 +92,9 @@ export class EnvironmentInjectorUtils {
    * 检查是否为多值提供者
    */
   static isMultiProvider(providers: Provider[]): boolean {
-    return providers.some(p => p.multi);
+    return providers.some(p => 
+      EnvironmentInjectorUtils.isDirectType(p) ? false : p.multi
+    );
   }
 
   /**
@@ -86,7 +113,7 @@ export class EnvironmentInjectorUtils {
           token: getTokenName(token),
           tokenType: getTokenType(token),
           providerType: EnvironmentInjectorUtils.getProviderType(provider),
-          isMulti: provider.multi || false,
+          isMulti: EnvironmentInjectorUtils.isDirectType(provider) ? false : (provider.multi || false),
           isLazy: false,
           metadata: {
             provider: provider

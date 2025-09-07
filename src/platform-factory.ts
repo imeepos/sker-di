@@ -66,8 +66,10 @@ class Platform extends PlatformRef {
       // 生成应用ID
       let appName: string;
       const hasApplicationConfig = providers.some(provider => 
-        provider.provide === APPLICATION_CONFIG || 
-        provider.provide === APPLICATION_BOOTSTRAP_CONTEXT
+        ('provide' in provider) && (
+          provider.provide === APPLICATION_CONFIG || 
+          provider.provide === APPLICATION_BOOTSTRAP_CONTEXT
+        )
       );
 
       if (hasApplicationConfig) {
@@ -97,7 +99,7 @@ class Platform extends PlatformRef {
     }
 
     // 确保启动上下文包含正确的平台名称
-    const contextProviderIndex = providers.findIndex(p => p.provide === APPLICATION_BOOTSTRAP_CONTEXT);
+    const contextProviderIndex = providers.findIndex(p => ('provide' in p) && p.provide === APPLICATION_BOOTSTRAP_CONTEXT);
     if (contextProviderIndex >= 0) {
       providers[contextProviderIndex] = {
         provide: APPLICATION_BOOTSTRAP_CONTEXT,

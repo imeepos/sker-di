@@ -1,5 +1,8 @@
-import { InjectionTokenType } from './injector';
+import { InjectionTokenType, Type } from './injector';
 import { ForwardRef } from './forward-ref';
+
+// Re-export Type for other modules
+export type { Type } from './injector';
 
 /**
  * 基础提供者接口，定义所有提供者的共同属性
@@ -23,7 +26,7 @@ export interface ValueProvider<T> extends BaseProvider<T> {
  * @template T 提供的实例类型
  */
 export interface ClassProvider<T> extends BaseProvider<T> {
-  useClass: (new (...args: any[]) => T) | ForwardRef<new (...args: any[]) => T>;
+  useClass: Type<T> | ForwardRef<Type<T>>;
 }
 
 /**
@@ -48,16 +51,17 @@ export interface ExistingProvider<T> extends BaseProvider<T> {
  * @template T 提供的实例类型
  */
 export interface ConstructorProvider<T> extends BaseProvider<T> {
-  provide: new (...args: any[]) => T;
+  provide: Type<T>;
 }
 
 /**
  * 提供者联合类型，包含所有可能的提供者类型
  * @template T 提供的值的类型，默认为 any
  */
-export type Provider<T = any> = 
+export type Provider<T = any> =
   | ValueProvider<T>
   | ClassProvider<T>
   | FactoryProvider<T>
   | ExistingProvider<T>
-  | ConstructorProvider<T>;
+  | ConstructorProvider<T>
+  | Type<T>;
