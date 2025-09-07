@@ -7,6 +7,7 @@ import { IDIDebugger, DI_DEBUGGER, DebugEventType } from './debug';
 import { FeatureRef, createFeatureRef } from './feature-ref';
 import { Injectable } from './injectable';
 import { Inject } from './inject';
+import { IInjectorRegistry, INJECTOR_REGISTRY } from './injector-registry';
 
 /**
  * 应用状态枚举
@@ -87,10 +88,15 @@ export class ApplicationManager implements OnDestroy {
   private _destroyed = false;
 
   constructor(
-    @Inject(DI_DEBUGGER) private readonly diDebugger: IDIDebugger
+    @Inject(DI_DEBUGGER) private readonly diDebugger: IDIDebugger,
+    @Inject(INJECTOR_REGISTRY) private readonly injectorRegistry: IInjectorRegistry
   ) {
-    // 暂时使用全局方式获取平台注入器，后续需要改进
-    this.platformInjector = EnvironmentInjector.getPlatformInjector()!;
+    // 使用DI方式获取平台注入器
+    const platformInjector = this.injectorRegistry.getPlatformInjector();
+    if (!platformInjector) {
+      throw new Error('Platform injector not found! ApplicationManager requires a platform injector.');
+    }
+    this.platformInjector = platformInjector;
   }
 
   private readonly platformInjector: EnvironmentInjector;
@@ -231,7 +237,7 @@ export class ApplicationManager implements OnDestroy {
   }
 
   private createApplicationInjector(providers: Provider[]): EnvironmentInjector {
-    return EnvironmentInjector.createApplicationInjector([...providers]);
+    return this.injectorRegistry.createApplicationInjector([...providers]);
   }
 
   private getApplicationConfig(injector: EnvironmentInjector, fallbackName: string): BaseApplicationConfig {

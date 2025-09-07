@@ -3,12 +3,28 @@ import { Injectable } from './injectable';
 import { Inject } from './inject';
 import { InjectionToken } from './injection-token';
 import { InjectOptions } from './inject-options';
-import { resetRootInjector } from './index';
+import { IInjectorRegistry, INJECTOR_REGISTRY, InjectorRegistry } from './injector-registry';
+import { IPlatformManager, PLATFORM_MANAGER, PlatformManager } from './platform-manager';
 
 describe('高级注入选项', () => {
-  // 在每个测试后重置根注入器
+  let tempRootInjector: EnvironmentInjector;
+  let injectorRegistry: IInjectorRegistry;
+
+  beforeEach(() => {
+    // 创建临时根注入器用于测试
+    tempRootInjector = new EnvironmentInjector([
+      { provide: INJECTOR_REGISTRY, useClass: InjectorRegistry },
+      { provide: PLATFORM_MANAGER, useClass: PlatformManager }
+    ], undefined, 'root');
+    
+    injectorRegistry = tempRootInjector.get(INJECTOR_REGISTRY);
+  });
+
   afterEach(() => {
-    resetRootInjector();
+    // 清理测试环境
+    if (tempRootInjector) {
+      tempRootInjector.destroy();
+    }
   });
   describe('skipSelf 选项', () => {
     it('应该跳过当前注入器，从父注入器查找', () => {
@@ -22,7 +38,7 @@ describe('高级注入选项', () => {
       }
 
       // 创建根注入器，提供令牌值
-      const rootInjector = EnvironmentInjector.createRootInjector([
+      const rootInjector = injectorRegistry.createRootInjector([
         { provide: TOKEN, useValue: 'parent-value' }
       ]);
 

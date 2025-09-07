@@ -1,16 +1,28 @@
 import 'reflect-metadata';
 import { Injectable } from './injectable';
-import { 
-  createRootInjector, 
-  createPlatformInjector,
-  createApplicationInjector,
-  createFeatureInjector,
-  resetRootInjector
-} from './index';
+import { EnvironmentInjector } from './environment-injector';
+import { IInjectorRegistry, INJECTOR_REGISTRY, InjectorRegistry } from './injector-registry';
+import { IPlatformManager, PLATFORM_MANAGER, PlatformManager } from './platform-manager';
 
 describe('应用注入器自动父级测试', () => {
+  let tempRootInjector: EnvironmentInjector;
+  let injectorRegistry: IInjectorRegistry;
+
+  beforeEach(() => {
+    // 创建临时根注入器用于测试
+    tempRootInjector = new EnvironmentInjector([
+      { provide: INJECTOR_REGISTRY, useClass: InjectorRegistry },
+      { provide: PLATFORM_MANAGER, useClass: PlatformManager }
+    ], undefined, 'root');
+    
+    injectorRegistry = tempRootInjector.get(INJECTOR_REGISTRY);
+  });
+
   afterEach(() => {
-    resetRootInjector(); // 这会同时重置平台注入器
+    // 清理测试环境
+    if (tempRootInjector) {
+      tempRootInjector.destroy();
+    }
   });
 
   @Injectable({ providedIn: 'root' })
@@ -36,11 +48,11 @@ describe('应用注入器自动父级测试', () => {
   describe('自动父级绑定', () => {
     it('应用注入器应该自动使用全局平台注入器作为父级', () => {
       // 创建根注入器和平台注入器
-      const rootInjector = createRootInjector();
-      const platformInjector = createPlatformInjector();
+      const rootInjector = injectorRegistry.createRootInjector();
+      const platformInjector = injectorRegistry.createPlatformInjector();
       
       // 创建应用注入器（不需要传入平台注入器）
-      const appInjector = createApplicationInjector([
+      const appInjector = injectorRegistry.createApplicationInjector([
         { provide: 'APP_CONFIG', useValue: 'app-value' }
       ]);
       
@@ -55,14 +67,14 @@ describe('应用注入器自动父级测试', () => {
     });
 
     it('可以创建多个应用注入器，都使用同一个平台注入器', () => {
-      createRootInjector();
-      const platformInjector = createPlatformInjector();
+      injectorRegistry.createRootInjector();
+      const platformInjector = injectorRegistry.createPlatformInjector();
       
-      const app1Injector = createApplicationInjector([
+      const app1Injector = injectorRegistry.createApplicationInjector([
         { provide: 'APP_NAME', useValue: 'App1' }
       ]);
       
-      const app2Injector = createApplicationInjector([
+      const app2Injector = injectorRegistry.createApplicationInjector([
         { provide: 'APP_NAME', useValue: 'App2' }
       ]);
       
@@ -86,12 +98,12 @@ describe('应用注入器自动父级测试', () => {
     });
 
     it('功能注入器仍然需要明确指定应用注入器', () => {
-      createRootInjector();
-      createPlatformInjector();
-      const appInjector = createApplicationInjector();
+      injectorRegistry.createRootInjector();
+      injectorRegistry.createPlatformInjector();
+      const appInjector = injectorRegistry.createApplicationInjector();
       
       // 功能注入器仍然需要明确指定应用注入器
-      const featureInjector = createFeatureInjector([
+      const featureInjector = injectorRegistry.createFeatureInjector([
         { provide: 'FEATURE_CONFIG', useValue: 'feature-value' }
       ], appInjector);
       
@@ -108,29 +120,29 @@ describe('应用注入器自动父级测试', () => {
 
   describe('错误处理', () => {
     it('没有平台注入器时创建应用注入器应该失败', () => {
-      createRootInjector();
+      injectorRegistry.createRootInjector();
       // 没有创建平台注入器
       
       expect(() => {
-        createApplicationInjector();
-      }).toThrow('Platform injector not found! Please create a platform injector first using createPlatformInjector() before creating application injector.');
+        injectorRegistry.createApplicationInjector();
+      }).toThrow('Platform injector must be created before application injector');
     });
 
     it('应该展示正确的创建顺序', () => {
       // ❌ 错误：没有根注入器
       expect(() => {
-        createApplicationInjector();
-      }).toThrow('Platform injector not found!');
+        injectorRegistry.createApplicationInjector();
+      }).toThrow('Platform injector must be created before application injector');
       
       // ❌ 错误：有根注入器但没有平台注入器
-      createRootInjector();
+      injectorRegistry.createRootInjector();
       expect(() => {
-        createApplicationInjector();
-      }).toThrow('Platform injector not found!');
+        injectorRegistry.createApplicationInjector();
+      }).toThrow('Platform injector must be created before application injector');
       
       // ✅ 正确：先创建平台注入器
-      createPlatformInjector();
-      const appInjector = createApplicationInjector();
+      injectorRegistry.createPlatformInjector();
+      const appInjector = injectorRegistry.createApplicationInjector();
       expect(appInjector).toBeDefined();
     });
   });
@@ -138,19 +150,19 @@ describe('应用注入器自动父级测试', () => {
   describe('完整的层次结构', () => {
     it('应该支持完整的自动化层次结构', () => {
       // 创建完整的层次结构
-      const rootInjector = createRootInjector([
+      const rootInjector = injectorRegistry.createRootInjector([
         { provide: 'ROOT_TOKEN', useValue: 'root-value' }
       ]);
       
-      const platformInjector = createPlatformInjector([
+      const platformInjector = injectorRegistry.createPlatformInjector([
         { provide: 'PLATFORM_TOKEN', useValue: 'platform-value' }
       ]);
       
-      const appInjector = createApplicationInjector([
+      const appInjector = injectorRegistry.createApplicationInjector([
         { provide: 'APP_TOKEN', useValue: 'app-value' }
       ]);
       
-      const featureInjector = createFeatureInjector([
+      const featureInjector = injectorRegistry.createFeatureInjector([
         { provide: 'FEATURE_TOKEN', useValue: 'feature-value' }
       ], appInjector);
       
@@ -174,29 +186,29 @@ describe('应用注入器自动父级测试', () => {
 
     it('应该支持多应用架构', () => {
       // 创建共享的基础设施
-      createRootInjector([
+      injectorRegistry.createRootInjector([
         { provide: 'SHARED_CONFIG', useValue: 'shared' }
       ]);
       
-      createPlatformInjector([
+      injectorRegistry.createPlatformInjector([
         { provide: 'PLATFORM_NAME', useValue: 'MyPlatform' }
       ]);
       
       // 创建多个应用
-      const webAppInjector = createApplicationInjector([
+      const webAppInjector = injectorRegistry.createApplicationInjector([
         { provide: 'APP_TYPE', useValue: 'web' }
       ]);
       
-      const mobileAppInjector = createApplicationInjector([
+      const mobileAppInjector = injectorRegistry.createApplicationInjector([
         { provide: 'APP_TYPE', useValue: 'mobile' }
       ]);
       
       // 为每个应用创建功能模块
-      const webUserFeature = createFeatureInjector([
+      const webUserFeature = injectorRegistry.createFeatureInjector([
         { provide: 'FEATURE_NAME', useValue: 'web-user' }
       ], webAppInjector);
       
-      const mobileUserFeature = createFeatureInjector([
+      const mobileUserFeature = injectorRegistry.createFeatureInjector([
         { provide: 'FEATURE_NAME', useValue: 'mobile-user' }
       ], mobileAppInjector);
       

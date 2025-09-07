@@ -5,6 +5,8 @@ import { Provider } from './provider';
 import { IDIDebugger, DI_DEBUGGER, DebugEventType, DIDebugger } from './debug';
 import { APPLICATION_CONFIG, APPLICATION_BOOTSTRAP_CONTEXT, BaseApplicationConfig, ApplicationBootstrapContext } from './application-config';
 import { ApplicationManager, ApplicationFeature } from './application-manager';
+import { IPlatformManager, PLATFORM_MANAGER, PlatformManager } from './platform-manager';
+import { IInjectorRegistry, INJECTOR_REGISTRY, InjectorRegistry } from './injector-registry';
 
 /**
  * 具体的平台实现
@@ -14,17 +16,27 @@ class Platform extends PlatformRef {
   private readonly debugger: IDIDebugger;
   private readonly extensions: PlatformExtension[] = [];
   private readonly applicationManager: ApplicationManager;
+  private readonly platformManager: IPlatformManager;
+  private readonly injectorRegistry: IInjectorRegistry;
 
   constructor(
     public readonly injector: EnvironmentInjector,
     public readonly config: PlatformConfig,
-    extensions: PlatformExtension[] = []
+    extensions: PlatformExtension[] = [],
+    platformManager: IPlatformManager,
+    injectorRegistry: IInjectorRegistry
   ) {
     super();
     this.extensions = extensions;
+    this.platformManager = platformManager;
+    this.injectorRegistry = injectorRegistry;
     // 从注入器获取调试器
     this.debugger = this.injector.get(DI_DEBUGGER);
     this.applicationManager = this.injector.get(ApplicationManager);
+    
+    // 将自己注册到平台管理器
+    this.platformManager.setPlatform(this);
+    
     this.initializeExtensions();
   }
 
@@ -140,7 +152,7 @@ class Platform extends PlatformRef {
   }
 
   createApplicationInjector(providers: Provider[] = []): EnvironmentInjector {
-    return EnvironmentInjector.createApplicationInjector(providers);
+    return this.injectorRegistry.createApplicationInjector(providers);
   }
 
   /**
@@ -270,11 +282,8 @@ class Platform extends PlatformRef {
     // 销毁注入器
     this.injector.destroy();
 
-    // 清除全局平台引用
-    GlobalPlatform.clearInstance();
-
-    // 清除全局注入器实例
-    (EnvironmentInjector as any).platformInjectorInstance = null;
+    // 清除平台管理器中的当前平台
+    this.platformManager.clearPlatform();
   }
 
   private async initializeExtensions(): Promise<void> {
@@ -302,43 +311,7 @@ class Platform extends PlatformRef {
   }
 }
 
-/**
- * 全局单一平台管理器
- */
-class GlobalPlatform {
-  private static instance: PlatformRef | null = null;
-
-  /**
-   * 设置全局平台实例
-   */
-  static setInstance(platform: PlatformRef): void {
-    if (this.instance && !this.instance.destroyed) {
-      throw new Error('A platform instance already exists. Only one platform can exist at a time.');
-    }
-    this.instance = platform;
-  }
-
-  /**
-   * 获取全局平台实例
-   */
-  static getInstance(): PlatformRef | null {
-    return this.instance;
-  }
-
-  /**
-   * 清除全局平台实例
-   */
-  static clearInstance(): void {
-    this.instance = null;
-  }
-
-  /**
-   * 检查是否存在平台实例
-   */
-  static hasInstance(): boolean {
-    return this.instance !== null && !this.instance.destroyed;
-  }
-}
+// GlobalPlatform 单例已移除，使用 PlatformManager 服务进行 DI 管理
 
 /**
  * 创建平台工厂函数
@@ -383,18 +356,13 @@ export function createPlatformFactory(
   module: PlatformModule
 ): PlatformFactory {
   return function platformFactory(extraProviders: Provider[] = []): PlatformRef {
-    // 检查是否已存在平台实例
-    if (GlobalPlatform.hasInstance()) {
-      const existingPlatform = GlobalPlatform.getInstance()!;
-      console.warn('Platform already exists. Returning existing platform instance.');
-      return existingPlatform;
-    }
-
-    // 合并提供者，包含核心调试服务
+    // 合并提供者，包含核心DI管理服务
     let allProviders: Provider[] = [
-      // 核心调试服务
+      // 核心DI管理服务
       { provide: DI_DEBUGGER, useClass: DIDebugger },
       { provide: ApplicationManager, useClass: ApplicationManager },
+      { provide: PLATFORM_MANAGER, useClass: PlatformManager },
+      { provide: INJECTOR_REGISTRY, useClass: InjectorRegistry },
       ...module.providers
     ];
     
@@ -417,67 +385,52 @@ export function createPlatformFactory(
     // 添加额外提供者
     allProviders.push(...extraProviders);
 
-    // 创建平台注入器
+    // 获取或创建注入器注册表实例
+    let injectorRegistry: IInjectorRegistry;
     let platformInjector: EnvironmentInjector;
     
     if (parentInjector) {
       // 如果有父注入器，直接创建子平台注入器
       platformInjector = new EnvironmentInjector(allProviders, parentInjector, 'platform');
+      injectorRegistry = platformInjector.get(INJECTOR_REGISTRY);
     } else {
-      // 如果没有父注入器，首先确保根注入器存在
-      let rootInjector = EnvironmentInjector.getRootInjector();
-      if (!rootInjector) {
-        // 自动创建根注入器
-        rootInjector = EnvironmentInjector.createRootInjector();
-      }
+      // 创建临时根注入器来获取注入器注册表
+      const tempRoot = new EnvironmentInjector([
+        { provide: INJECTOR_REGISTRY, useClass: InjectorRegistry }
+      ], undefined, 'root');
+      injectorRegistry = tempRoot.get(INJECTOR_REGISTRY);
       
-      // 然后创建平台注入器
-      platformInjector = EnvironmentInjector.createPlatformInjector(allProviders);
+      // 使用注入器注册表创建根注入器和平台注入器
+      injectorRegistry.createRootInjector();
+      platformInjector = injectorRegistry.createPlatformInjector(allProviders);
+    }
+
+    // 获取平台管理器
+    const platformManager = platformInjector.get(PLATFORM_MANAGER);
+    
+    // 检查是否已存在平台实例
+    if (platformManager.hasPlatform()) {
+      const existingPlatform = platformManager.getCurrentPlatform()!;
+      console.warn('Platform already exists. Returning existing platform instance.');
+      return existingPlatform;
     }
 
     // 创建平台实例
     const platform = new Platform(
       platformInjector,
       module.config,
-      module.extensions || []
+      module.extensions || [],
+      platformManager,
+      injectorRegistry
     );
-
-    // 设置为全局平台实例
-    GlobalPlatform.setInstance(platform);
 
     return platform;
   };
 }
 
-/**
- * 获取全局平台实例
- */
-export function getPlatform(): PlatformRef | null {
-  return GlobalPlatform.getInstance();
-}
+// 移除全局函数，请使用 PlatformManager 服务
+// 这些函数违反了 "一切皆服务，一切皆可注入" 原则
+// 请通过依赖注入获取 PlatformManager 来管理平台
 
-/**
- * 销毁全局平台实例
- */
-export function destroyPlatform(): boolean {
-  const platform = GlobalPlatform.getInstance();
-  if (platform) {
-    platform.destroy();
-    return true;
-  }
-  return false;
-}
-
-/**
- * 检查是否存在平台实例
- */
-export function hasPlatform(): boolean {
-  return GlobalPlatform.hasInstance();
-}
-
-// 在模块卸载时清理平台
-if (typeof process !== 'undefined' && process.on) {
-  process.on('exit', () => {
-    destroyPlatform();
-  });
-}
+// 模块卸载时的清理由 PlatformManager 服务管理
+// 不再使用全局函数进行平台清理

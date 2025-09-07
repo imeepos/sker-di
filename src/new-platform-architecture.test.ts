@@ -1,21 +1,39 @@
 import { 
   createPlatformFactory,
-  getPlatform,
-  destroyPlatform,
-  hasPlatform,
   ApplicationFeature,
   ApplicationState,
   provideApplicationConfig,
-  ApplicationConfig
+  ApplicationConfig,
+  PLATFORM_MANAGER,
+  IPlatformManager
 } from './index';
+import { EnvironmentInjector } from './environment-injector';
+import { PlatformManager } from './platform-manager';
+import { InjectorRegistry, INJECTOR_REGISTRY } from './injector-registry';
 
 describe('新平台架构', () => {
+  let tempRootInjector: EnvironmentInjector;
+  let platformManager: IPlatformManager;
+
+  beforeEach(() => {
+    // 创建临时根注入器用于测试
+    tempRootInjector = new EnvironmentInjector([
+      { provide: INJECTOR_REGISTRY, useClass: InjectorRegistry },
+      { provide: PLATFORM_MANAGER, useClass: PlatformManager }
+    ], undefined, 'root');
+    
+    platformManager = tempRootInjector.get(PLATFORM_MANAGER);
+  });
+
   afterEach(() => {
     // 每个测试后清理平台
-    destroyPlatform();
-    // 清理全局注入器实例
-    (require('./environment-injector').EnvironmentInjector as any).rootInjectorInstance = null;
-    (require('./environment-injector').EnvironmentInjector as any).platformInjectorInstance = null;
+    if (platformManager.hasPlatform()) {
+      platformManager.destroyCurrentPlatform();
+    }
+    // 清理测试环境
+    if (tempRootInjector) {
+      tempRootInjector.destroy();
+    }
   });
 
   describe('单一平台原则', () => {
