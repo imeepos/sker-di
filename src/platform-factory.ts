@@ -8,6 +8,9 @@ import { ApplicationManager, ApplicationFeature } from './application-manager';
 import { IPlatformManager, PLATFORM_MANAGER, PlatformManager } from './platform-manager';
 import { IInjectorRegistry, INJECTOR_REGISTRY, InjectorRegistry } from './injector-registry';
 
+// 全局注入器注册表实例，确保跨平台工厂调用的一致性
+let globalInjectorRegistry: IInjectorRegistry | null = null;
+
 /**
  * 具体的平台实现
  */
@@ -394,15 +397,27 @@ export function createPlatformFactory(
       platformInjector = new EnvironmentInjector(allProviders, parentInjector, 'platform');
       injectorRegistry = platformInjector.get(INJECTOR_REGISTRY);
     } else {
-      // 创建临时根注入器来获取注入器注册表
-      const tempRoot = new EnvironmentInjector([
-        { provide: INJECTOR_REGISTRY, useClass: InjectorRegistry }
-      ], undefined, 'root');
-      injectorRegistry = tempRoot.get(INJECTOR_REGISTRY);
+      // 使用全局注入器注册表实例（确保跨平台工厂调用的一致性）
+      if (!globalInjectorRegistry) {
+        const tempRoot = new EnvironmentInjector([
+          { provide: INJECTOR_REGISTRY, useClass: InjectorRegistry },
+          { provide: PLATFORM_MANAGER, useClass: PlatformManager }
+        ], undefined, 'root');
+        globalInjectorRegistry = tempRoot.get(INJECTOR_REGISTRY);
+      }
+      injectorRegistry = globalInjectorRegistry;
       
-      // 使用注入器注册表创建根注入器和平台注入器
-      injectorRegistry.createRootInjector();
-      platformInjector = injectorRegistry.createPlatformInjector(allProviders);
+      // 检查是否已有平台注入器
+      const existingPlatformInjector = injectorRegistry.getPlatformInjector();
+      if (existingPlatformInjector) {
+        platformInjector = existingPlatformInjector;
+      } else {
+        // 创建根注入器和平台注入器
+        if (!injectorRegistry.getRootInjector()) {
+          injectorRegistry.createRootInjector();
+        }
+        platformInjector = injectorRegistry.createPlatformInjector(allProviders);
+      }
     }
 
     // 获取平台管理器
@@ -434,3 +449,11 @@ export function createPlatformFactory(
 
 // 模块卸载时的清理由 PlatformManager 服务管理
 // 不再使用全局函数进行平台清理
+
+/**
+ * 重置全局注入器注册表（用于测试）
+ * @internal
+ */
+export function resetGlobalInjectorRegistry(): void {
+  globalInjectorRegistry = null;
+}

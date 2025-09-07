@@ -1,17 +1,26 @@
 import 'reflect-metadata';
 import { Injectable } from './injectable';
 import { 
-  createRootInjector, 
-  createPlatformInjector,
-  createApplicationInjector,
-  createFeatureInjector,
-  resetRootInjector,
-  getRootInjector
+  INJECTOR_REGISTRY,
+  IInjectorRegistry,
+  InjectorRegistry,
+  createInjector,
+  EnvironmentInjector
 } from './index';
 
 describe('严格的注入器层次结构测试', () => {
+  let registry: IInjectorRegistry;
+
+  beforeEach(() => {
+    // 创建独立的注入器注册表  
+    const rootInjector = createInjector([
+      { provide: INJECTOR_REGISTRY, useClass: InjectorRegistry }
+    ], undefined, 'root');
+    registry = rootInjector.get(INJECTOR_REGISTRY);
+  });
+
   afterEach(() => {
-    resetRootInjector();
+    registry && registry.destroyAll();
   });
 
   @Injectable({ providedIn: 'root' })
@@ -36,41 +45,36 @@ describe('严格的注入器层次结构测试', () => {
 
   describe('强制的层次结构', () => {
     it('必须按照正确的顺序创建注入器', () => {
-      // ❌ 错误：没有根注入器就创建平台注入器
-      expect(() => {
-        createPlatformInjector();
-      }).toThrow('Root injector not found! Please create a root injector first using createRootInjector() before creating platform injector.');
-
-      // ✅ 正确：先创建根注入器
-      const rootInjector = createRootInjector();
-      expect(rootInjector).toBeDefined();
-      expect(rootInjector.scope).toBe('root');
-
-      // ✅ 正确：然后创建平台注入器（单例）
-      const platformInjector = createPlatformInjector();
+      // ✅ 新架构：平台注入器会自动创建根注入器，不再需要严格顺序
+      const platformInjector = registry.createPlatformInjector();
       expect(platformInjector).toBeDefined();
       expect(platformInjector.scope).toBe('platform');
+
+      // 验证自动创建的根注入器
+      const rootInjector = registry.getRootInjector();
+      expect(rootInjector).toBeDefined();
+      expect(rootInjector!.scope).toBe('root');
       expect(platformInjector.parent).toBe(rootInjector);
 
       // ✅ 正确：然后创建应用注入器（自动使用全局平台注入器）
-      const appInjector = createApplicationInjector();
+      const appInjector = registry.createApplicationInjector();
       expect(appInjector).toBeDefined();
       expect(appInjector.scope).toBe('application');
       expect(appInjector.parent).toBe(platformInjector);
 
       // ✅ 正确：最后创建功能注入器
-      const featureInjector = createFeatureInjector([], appInjector);
+      const featureInjector = registry.createFeatureInjector([], appInjector);
       expect(featureInjector).toBeDefined();
       expect(featureInjector.scope).toBe('feature');
       expect(featureInjector.parent).toBe(appInjector);
     });
 
     it('平台注入器自动使用全局根注入器', () => {
-      const rootInjector = createRootInjector([
+      const rootInjector = registry.createRootInjector([
         { provide: 'ROOT_CONFIG', useValue: 'root-value' }
       ]);
 
-      const platformInjector = createPlatformInjector([
+      const platformInjector = registry.createPlatformInjector([
         { provide: 'PLATFORM_CONFIG', useValue: 'platform-value' }
       ]);
 
@@ -83,22 +87,22 @@ describe('严格的注入器层次结构测试', () => {
     });
 
     it('不能跳过层次创建注入器', () => {
-      const rootInjector = createRootInjector();
+      const rootInjector = registry.createRootInjector();
 
       // ❌ 错误：没有平台注入器就创建应用注入器
       expect(() => {
-        createApplicationInjector();
-      }).toThrow('Platform injector not found!'); // 现在会强制检查平台注入器
+        registry.createApplicationInjector();
+      }).toThrow('Platform injector must be created before application injector');
     });
   });
 
   describe('层次结构的完整性', () => {
     it('应该支持完整的四层结构', () => {
       // 创建完整的层次结构
-      const rootInjector = createRootInjector();
-      const platformInjector = createPlatformInjector();
-      const appInjector = createApplicationInjector();
-      const featureInjector = createFeatureInjector([], appInjector);
+      const rootInjector = registry.createRootInjector();
+      const platformInjector = registry.createPlatformInjector();
+      const appInjector = registry.createApplicationInjector();
+      const featureInjector = registry.createFeatureInjector([], appInjector);
 
       // 验证层次关系
       expect(platformInjector.parent).toBe(rootInjector);
@@ -118,10 +122,10 @@ describe('严格的注入器层次结构测试', () => {
     });
 
     it('服务应该在正确的层级实例化', () => {
-      const rootInjector = createRootInjector();
-      const platformInjector = createPlatformInjector();
-      const app1Injector = createApplicationInjector();
-      const app2Injector = createApplicationInjector();
+      const rootInjector = registry.createRootInjector();
+      const platformInjector = registry.createPlatformInjector();
+      const app1Injector = registry.createApplicationInjector();
+      const app2Injector = registry.createApplicationInjector();
 
       // root 和 platform 服务应该在所有子注入器中共享
       const rootService1 = app1Injector.get(RootService);
@@ -142,60 +146,62 @@ describe('严格的注入器层次结构测试', () => {
 
   describe('错误处理和提示', () => {
     it('应该提供清晰的错误信息', () => {
+      // 新架构不再需要这个错误，平台注入器会自动创建根注入器
+      // 测试应用注入器需要平台注入器的错误
       expect(() => {
-        createPlatformInjector();
-      }).toThrow('Root injector not found! Please create a root injector first using createRootInjector() before creating platform injector.');
+        registry.createApplicationInjector();
+      }).toThrow('Platform injector must be created before application injector');
     });
 
     it('应该防止重复创建根注入器', () => {
-      createRootInjector();
+      registry.createRootInjector();
 
       expect(() => {
-        createRootInjector();
-      }).toThrow('Root injector already exists! Root injector must be globally unique.');
+        registry.createRootInjector();
+      }).toThrow('Root injector already exists. Call resetRootInjector() first to recreate it.');
     });
 
     it('应该防止重复创建平台注入器', () => {
-      createRootInjector();
-      createPlatformInjector();
+      registry.createRootInjector();
+      registry.createPlatformInjector();
 
       expect(() => {
-        createPlatformInjector();
-      }).toThrow('Platform injector already exists! Platform injector must be globally unique.');
+        registry.createPlatformInjector();
+      }).toThrow('Platform injector already exists. Call resetPlatformInjector() first to recreate it.');
     });
 
     it('重置后应该可以重新创建', () => {
-      const rootInjector1 = createRootInjector();
-      expect(getRootInjector()).toBe(rootInjector1);
+      const rootInjector1 = registry.createRootInjector();
+      expect(registry.getRootInjector()).toBe(rootInjector1);
 
-      resetRootInjector();
-      expect(getRootInjector()).toBeNull();
+      registry.resetRootInjector();
+      expect(registry.getRootInjector()).toBeNull();
 
-      const rootInjector2 = createRootInjector();
+      const rootInjector2 = registry.createRootInjector();
       expect(rootInjector2).not.toBe(rootInjector1);
-      expect(getRootInjector()).toBe(rootInjector2);
+      expect(registry.getRootInjector()).toBe(rootInjector2);
     });
   });
 
   describe('类型安全', () => {
     it('应用注入器必须接受平台注入器作为父级', () => {
-      const rootInjector = createRootInjector();
-      const platformInjector = createPlatformInjector();
+      const rootInjector = registry.createRootInjector();
+      const platformInjector = registry.createPlatformInjector();
 
       // ✅ 正确：自动使用全局平台注入器作为父级
-      const appInjector = createApplicationInjector();
+      const appInjector = registry.createApplicationInjector();
       expect(appInjector.parent).toBe(platformInjector);
 
       // 现在不需要传入平台注入器参数了
     });
 
     it('功能注入器必须接受应用注入器作为父级', () => {
-      const rootInjector = createRootInjector();
-      const platformInjector = createPlatformInjector();
-      const appInjector = createApplicationInjector();
+      const rootInjector = registry.createRootInjector();
+      const platformInjector = registry.createPlatformInjector();
+      const appInjector = registry.createApplicationInjector();
 
       // ✅ 正确：使用应用注入器作为父级
-      const featureInjector = createFeatureInjector([], appInjector);
+      const featureInjector = registry.createFeatureInjector([], appInjector);
       expect(featureInjector.parent).toBe(appInjector);
 
       // TypeScript 应该阻止以下错误用法：
@@ -206,26 +212,26 @@ describe('严格的注入器层次结构测试', () => {
   describe('实际使用场景', () => {
     it('应该支持典型的应用架构', () => {
       // 1. 应用启动时创建根注入器
-      const rootInjector = createRootInjector([
+      const rootInjector = registry.createRootInjector([
         { provide: 'APP_VERSION', useValue: '1.0.0' }
       ]);
 
       // 2. 创建平台注入器（跨应用共享）
-      const platformInjector = createPlatformInjector([
+      const platformInjector = registry.createPlatformInjector([
         { provide: 'PLATFORM_NAME', useValue: 'MyPlatform' }
       ]);
 
       // 3. 为每个应用创建应用注入器
-      const webAppInjector = createApplicationInjector([
+      const webAppInjector = registry.createApplicationInjector([
         { provide: 'APP_TYPE', useValue: 'web' }
       ]);
 
-      const mobileAppInjector = createApplicationInjector([
+      const mobileAppInjector = registry.createApplicationInjector([
         { provide: 'APP_TYPE', useValue: 'mobile' }
       ]);
 
       // 4. 为每个功能模块创建功能注入器
-      const userFeatureInjector = createFeatureInjector([
+      const userFeatureInjector = registry.createFeatureInjector([
         { provide: 'FEATURE_NAME', useValue: 'user-management' }
       ], webAppInjector);
 

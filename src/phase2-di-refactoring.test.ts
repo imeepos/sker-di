@@ -7,6 +7,7 @@ import { IPlatformManager, PLATFORM_MANAGER, PlatformManager } from './platform-
 
 describe('第二阶段 DI 重构验证', () => {
   let tempRootInjector: EnvironmentInjector;
+  let injectorRegistry: IInjectorRegistry;
 
   beforeEach(() => {
     // 创建临时根注入器用于测试
@@ -14,13 +15,13 @@ describe('第二阶段 DI 重构验证', () => {
       { provide: INJECTOR_REGISTRY, useClass: InjectorRegistry },
       { provide: PLATFORM_MANAGER, useClass: PlatformManager }
     ], undefined, 'root');
+    
+    injectorRegistry = tempRootInjector.get(INJECTOR_REGISTRY);
   });
 
   afterEach(() => {
-    // 清理测试环境
-    if (tempRootInjector) {
-      tempRootInjector.destroy();
-    }
+    // 清理所有注入器
+    injectorRegistry && injectorRegistry.destroyAll();
   });
 
   @Injectable({ providedIn: 'root' })

@@ -1,19 +1,26 @@
 import 'reflect-metadata';
 import { Injectable } from './injectable';
-import { 
-  createRootInjector, 
-  createPlatformInjector,
-  createApplicationInjector,
-  getRootInjector,
-  getPlatformInjector,
-  resetRootInjector,
-  resetPlatformInjector
-} from './index';
+import { EnvironmentInjector } from './environment-injector';
+import { IInjectorRegistry, INJECTOR_REGISTRY, InjectorRegistry } from './injector-registry';
+import { IPlatformManager, PLATFORM_MANAGER, PlatformManager } from './platform-manager';
 
 describe('平台注入器单例测试', () => {
-  // 在每个测试后重置注入器
+  let tempRootInjector: EnvironmentInjector;
+  let injectorRegistry: IInjectorRegistry;
+
+  beforeEach(() => {
+    // 创建临时根注入器用于测试
+    tempRootInjector = new EnvironmentInjector([
+      { provide: INJECTOR_REGISTRY, useClass: InjectorRegistry },
+      { provide: PLATFORM_MANAGER, useClass: PlatformManager }
+    ], undefined, 'root');
+    
+    injectorRegistry = tempRootInjector.get(INJECTOR_REGISTRY);
+  });
+
   afterEach(() => {
-    resetRootInjector(); // 这会同时重置平台注入器
+    // 清理所有注入器
+    injectorRegistry && injectorRegistry.destroyAll();
   });
 
   @Injectable({ providedIn: 'platform' })
@@ -29,10 +36,10 @@ describe('平台注入器单例测试', () => {
   describe('单例行为', () => {
     it('应该只允许创建一个平台注入器', () => {
       // 先创建根注入器
-      const rootInjector = createRootInjector();
+      const rootInjector = injectorRegistry.createRootInjector();
       
       // 第一次创建平台注入器应该成功
-      const platformInjector1 = createPlatformInjector([
+      const platformInjector1 = injectorRegistry.createPlatformInjector([
         { provide: 'PLATFORM_CONFIG', useValue: { version: '1.0.0' } }
       ]);
       
@@ -42,50 +49,50 @@ describe('平台注入器单例测试', () => {
       
       // 第二次创建应该抛出错误
       expect(() => {
-        createPlatformInjector([
+        injectorRegistry.createPlatformInjector([
           { provide: 'ANOTHER_CONFIG', useValue: { version: '2.0.0' } }
         ]);
-      }).toThrow('Platform injector already exists! Platform injector must be globally unique.');
+      }).toThrow('Platform injector already exists. Call resetPlatformInjector() first to recreate it.');
     });
 
     it('getPlatformInjector 应该返回已创建的平台注入器', () => {
       // 初始状态应该返回 null
-      expect(getPlatformInjector()).toBeNull();
+      expect(injectorRegistry.getPlatformInjector()).toBeNull();
       
       // 创建根注入器和平台注入器
-      createRootInjector();
-      const platformInjector = createPlatformInjector([
+      injectorRegistry.createRootInjector();
+      const platformInjector = injectorRegistry.createPlatformInjector([
         { provide: 'TEST_TOKEN', useValue: 'test-value' }
       ]);
       
       // 获取应该返回同一个实例
-      const retrievedInjector = getPlatformInjector();
+      const retrievedInjector = injectorRegistry.getPlatformInjector();
       expect(retrievedInjector).toBe(platformInjector);
       expect(retrievedInjector?.get('TEST_TOKEN')).toBe('test-value');
     });
 
     it('resetPlatformInjector 应该允许重新创建平台注入器', () => {
       // 创建根注入器和第一个平台注入器
-      createRootInjector();
-      const platformInjector1 = createPlatformInjector([
+      injectorRegistry.createRootInjector();
+      const platformInjector1 = injectorRegistry.createPlatformInjector([
         { provide: 'CONFIG1', useValue: 'value1' }
       ]);
       
       expect(platformInjector1.get('CONFIG1')).toBe('value1');
-      expect(getPlatformInjector()).toBe(platformInjector1);
+      expect(injectorRegistry.getPlatformInjector()).toBe(platformInjector1);
       
       // 重置平台注入器
-      resetPlatformInjector();
-      expect(getPlatformInjector()).toBeNull();
+      injectorRegistry.resetPlatformInjector();
+      expect(injectorRegistry.getPlatformInjector()).toBeNull();
       
       // 现在应该可以创建新的平台注入器
-      const platformInjector2 = createPlatformInjector([
+      const platformInjector2 = injectorRegistry.createPlatformInjector([
         { provide: 'CONFIG2', useValue: 'value2' }
       ]);
       
       expect(platformInjector2).not.toBe(platformInjector1);
       expect(platformInjector2.get('CONFIG2')).toBe('value2');
-      expect(getPlatformInjector()).toBe(platformInjector2);
+      expect(injectorRegistry.getPlatformInjector()).toBe(platformInjector2);
       
       // 第一个注入器应该已经被销毁
       expect(() => platformInjector1.get('CONFIG1')).toThrow();
@@ -93,46 +100,44 @@ describe('平台注入器单例测试', () => {
 
     it('resetRootInjector 应该同时重置平台注入器', () => {
       // 创建根注入器和平台注入器
-      const rootInjector = createRootInjector();
-      const platformInjector = createPlatformInjector();
+      const rootInjector = injectorRegistry.createRootInjector();
+      const platformInjector = injectorRegistry.createPlatformInjector();
       
-      expect(getRootInjector()).toBe(rootInjector);
-      expect(getPlatformInjector()).toBe(platformInjector);
+      expect(injectorRegistry.getRootInjector()).toBe(rootInjector);
+      expect(injectorRegistry.getPlatformInjector()).toBe(platformInjector);
       
       // 重置根注入器应该同时重置平台注入器
-      resetRootInjector();
+      injectorRegistry.resetRootInjector();
       
-      expect(getRootInjector()).toBeNull();
-      expect(getPlatformInjector()).toBeNull();
+      expect(injectorRegistry.getRootInjector()).toBeNull();
+      expect(injectorRegistry.getPlatformInjector()).toBeNull();
     });
   });
 
   describe('依赖关系', () => {
     it('平台注入器必须在根注入器之后创建', () => {
-      // 没有根注入器时创建平台注入器应该失败
-      expect(() => {
-        createPlatformInjector();
-      }).toThrow('Root injector not found! Please create a root injector first using createRootInjector() before creating platform injector.');
-      
-      // 创建根注入器后应该成功
-      createRootInjector();
-      const platformInjector = createPlatformInjector();
+      // 现在的逻辑是自动创建根注入器，所以直接测试创建成功
+      const platformInjector = injectorRegistry.createPlatformInjector();
       expect(platformInjector).toBeDefined();
+      
+      // 验证根注入器已被自动创建
+      expect(injectorRegistry.getRootInjector()).toBeDefined();
+      expect(platformInjector.parent).toBe(injectorRegistry.getRootInjector());
     });
 
     it('应用注入器应该能使用全局平台注入器', () => {
       // 创建根注入器和平台注入器
-      createRootInjector();
-      const platformInjector = createPlatformInjector([
+      injectorRegistry.createRootInjector();
+      const platformInjector = injectorRegistry.createPlatformInjector([
         { provide: 'PLATFORM_TOKEN', useValue: 'platform-value' }
       ]);
       
       // 创建多个应用注入器，都使用同一个平台注入器
-      const app1Injector = createApplicationInjector([
+      const app1Injector = injectorRegistry.createApplicationInjector([
         { provide: 'APP1_TOKEN', useValue: 'app1-value' }
       ]);
 
-      const app2Injector = createApplicationInjector([
+      const app2Injector = injectorRegistry.createApplicationInjector([
         { provide: 'APP2_TOKEN', useValue: 'app2-value' }
       ]);
       
@@ -155,8 +160,8 @@ describe('平台注入器单例测试', () => {
 
   describe('服务解析', () => {
     it('platform 服务应该在平台注入器中正确解析', () => {
-      createRootInjector();
-      const platformInjector = createPlatformInjector();
+      injectorRegistry.createRootInjector();
+      const platformInjector = injectorRegistry.createPlatformInjector();
       
       const service = platformInjector.get(PlatformService);
       expect(service).toBeInstanceOf(PlatformService);
@@ -168,9 +173,9 @@ describe('平台注入器单例测试', () => {
     });
 
     it('子注入器应该能继承平台注入器的服务', () => {
-      createRootInjector();
-      const platformInjector = createPlatformInjector();
-      const appInjector = createApplicationInjector();
+      injectorRegistry.createRootInjector();
+      const platformInjector = injectorRegistry.createPlatformInjector();
+      const appInjector = injectorRegistry.createApplicationInjector();
       
       const platformService1 = platformInjector.get(PlatformService);
       const platformService2 = appInjector.get(PlatformService);
@@ -180,8 +185,8 @@ describe('平台注入器单例测试', () => {
     });
 
     it('平台注入器应该能访问根注入器的服务', () => {
-      createRootInjector();
-      const platformInjector = createPlatformInjector();
+      injectorRegistry.createRootInjector();
+      const platformInjector = injectorRegistry.createPlatformInjector();
       
       const rootService = platformInjector.get(RootService);
       expect(rootService).toBeInstanceOf(RootService);
@@ -189,10 +194,10 @@ describe('平台注入器单例测试', () => {
     });
 
     it('多个应用应该共享平台服务实例', () => {
-      createRootInjector();
-      const platformInjector = createPlatformInjector();
-      const app1Injector = createApplicationInjector();
-      const app2Injector = createApplicationInjector();
+      injectorRegistry.createRootInjector();
+      const platformInjector = injectorRegistry.createPlatformInjector();
+      const app1Injector = injectorRegistry.createApplicationInjector();
+      const app2Injector = injectorRegistry.createApplicationInjector();
       
       const platformService1 = app1Injector.get(PlatformService);
       const platformService2 = app2Injector.get(PlatformService);
@@ -206,23 +211,23 @@ describe('平台注入器单例测试', () => {
 
   describe('错误处理', () => {
     it('应该提供清晰的错误信息', () => {
-      createRootInjector();
-      createPlatformInjector();
+      injectorRegistry.createRootInjector();
+      injectorRegistry.createPlatformInjector();
       
       expect(() => {
-        createPlatformInjector();
-      }).toThrow('Platform injector already exists! Platform injector must be globally unique.');
+        injectorRegistry.createPlatformInjector();
+      }).toThrow('Platform injector already exists. Call resetPlatformInjector() first to recreate it.');
     });
 
     it('重置不存在的平台注入器应该安全', () => {
-      expect(getPlatformInjector()).toBeNull();
+      expect(injectorRegistry.getPlatformInjector()).toBeNull();
       
       // 重置不存在的平台注入器不应该抛出错误
       expect(() => {
-        resetPlatformInjector();
+        injectorRegistry.resetPlatformInjector();
       }).not.toThrow();
       
-      expect(getPlatformInjector()).toBeNull();
+      expect(injectorRegistry.getPlatformInjector()).toBeNull();
     });
   });
 });

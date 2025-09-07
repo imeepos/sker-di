@@ -91,15 +91,20 @@ export class ApplicationManager implements OnDestroy {
     @Inject(DI_DEBUGGER) private readonly diDebugger: IDIDebugger,
     @Inject(INJECTOR_REGISTRY) private readonly injectorRegistry: IInjectorRegistry
   ) {
-    // 使用DI方式获取平台注入器
-    const platformInjector = this.injectorRegistry.getPlatformInjector();
-    if (!platformInjector) {
-      throw new Error('Platform injector not found! ApplicationManager requires a platform injector.');
-    }
-    this.platformInjector = platformInjector;
+    // 平台注入器将在需要时延迟获取
   }
 
-  private readonly platformInjector: EnvironmentInjector;
+  private _platformInjector: EnvironmentInjector | null = null;
+  
+  private get platformInjector(): EnvironmentInjector {
+    if (!this._platformInjector) {
+      this._platformInjector = this.injectorRegistry.getPlatformInjector();
+      if (!this._platformInjector) {
+        throw new Error('Platform injector not found! ApplicationManager requires a platform injector.');
+      }
+    }
+    return this._platformInjector;
+  }
 
   /**
    * 创建新应用

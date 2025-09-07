@@ -1,13 +1,29 @@
 import 'reflect-metadata';
 import { Injectable } from './injectable';
-import { createRootInjector, createPlatformInjector, createApplicationInjector, resetRootInjector } from './index';
 import { InjectionToken } from './injection-token';
+import { IInjectorRegistry, INJECTOR_REGISTRY, InjectorRegistry } from './injector-registry';
+import { EnvironmentInjector } from './environment-injector';
+import { PLATFORM_MANAGER, PlatformManager } from './platform-manager';
 
 describe('Platform 注入器支持', () => {
   // 在每个测试后重置根注入器
-  afterEach(() => {
-    resetRootInjector();
-  });
+  let tempRootInjector: EnvironmentInjector;
+   let injectorRegistry: IInjectorRegistry;
+ 
+   beforeEach(() => {
+     // 创建临时根注入器用于测试
+     tempRootInjector = new EnvironmentInjector([
+       { provide: INJECTOR_REGISTRY, useClass: InjectorRegistry },
+       { provide: PLATFORM_MANAGER, useClass: PlatformManager }
+     ], undefined, 'root');
+     
+     injectorRegistry = tempRootInjector.get(INJECTOR_REGISTRY);
+   });
+
+   afterEach(() => {
+     // 清理所有注入器
+     injectorRegistry && injectorRegistry.destroyAll();
+   });
   describe('createPlatformInjector', () => {
     it('应该创建平台注入器并自动解析 providedIn: "platform" 的服务', () => {
       @Injectable({ providedIn: 'platform' })
@@ -17,8 +33,8 @@ describe('Platform 注入器支持', () => {
         }
       }
 
-      createRootInjector(); // 必须先创建根注入器
-      const platformInjector = createPlatformInjector();
+      injectorRegistry.createRootInjector(); // 必须先创建根注入器
+      const platformInjector = injectorRegistry.createPlatformInjector();
       
       const logger = platformInjector.get(PlatformLoggerService);
       expect(logger).toBeInstanceOf(PlatformLoggerService);
@@ -33,8 +49,8 @@ describe('Platform 注入器支持', () => {
         }
       }
 
-      createRootInjector(); // 必须先创建根注入器
-      const platformInjector = createPlatformInjector();
+      injectorRegistry.createRootInjector(); // 必须先创建根注入器
+      const platformInjector = injectorRegistry.createPlatformInjector();
       
       const service = platformInjector.get(RootService);
       expect(service).toBeInstanceOf(RootService);
@@ -44,8 +60,8 @@ describe('Platform 注入器支持', () => {
     it('应该支持手动注册的提供者', () => {
       const CONFIG_TOKEN = new InjectionToken<{ version: string }>('CONFIG');
       
-      createRootInjector(); // 必须先创建根注入器
-      const platformInjector = createPlatformInjector([
+      injectorRegistry.createRootInjector(); // 必须先创建根注入器
+      const platformInjector = injectorRegistry.createPlatformInjector([
         { provide: CONFIG_TOKEN, useValue: { version: '1.0.0' } }
       ]);
       
@@ -54,8 +70,8 @@ describe('Platform 注入器支持', () => {
     });
 
     it('应该正确标识为平台注入器', () => {
-      createRootInjector(); // 必须先创建根注入器
-      const platformInjector = createPlatformInjector();
+      injectorRegistry.createRootInjector(); // 必须先创建根注入器
+      const platformInjector = injectorRegistry.createPlatformInjector();
       expect(platformInjector.scope).toBe('platform');
     });
   });
@@ -76,9 +92,9 @@ describe('Platform 注入器支持', () => {
         }
       }
 
-      createRootInjector(); // 必须先创建根注入器
-      createPlatformInjector(); // 必须先创建平台注入器
-      const appInjector = createApplicationInjector();
+      injectorRegistry.createRootInjector(); // 必须先创建根注入器
+      injectorRegistry.createPlatformInjector(); // 必须先创建平台注入器
+      const appInjector = injectorRegistry.createApplicationInjector();
       
       // 应该能获取平台服务
       const platformService = appInjector.get(PlatformService);
@@ -90,9 +106,9 @@ describe('Platform 注入器支持', () => {
     });
 
     it('应该正确标识为应用注入器', () => {
-      createRootInjector(); // 必须先创建根注入器
-      createPlatformInjector(); // 必须先创建平台注入器
-      const appInjector = createApplicationInjector();
+      injectorRegistry.createRootInjector(); // 必须先创建根注入器
+      injectorRegistry.createPlatformInjector(); // 必须先创建平台注入器
+      const appInjector = injectorRegistry.createApplicationInjector();
       
       expect(appInjector.scope).toBe('application');
     });
@@ -105,9 +121,9 @@ describe('Platform 注入器支持', () => {
         }
       }
 
-      createRootInjector(); // 必须先创建根注入器
-      const platformInjector = createPlatformInjector();
-      const appInjector = createApplicationInjector();
+      injectorRegistry.createRootInjector(); // 必须先创建根注入器
+      const platformInjector = injectorRegistry.createPlatformInjector();
+      const appInjector = injectorRegistry.createApplicationInjector();
       
       // 平台注入器可以解析
       const platformService = platformInjector.get(PlatformOnlyService);
@@ -138,9 +154,9 @@ describe('Platform 注入器支持', () => {
       const APP_TOKEN = new InjectionToken<string>('APP_TOKEN');
       
       // 创建层次结构
-      createRootInjector(); // 必须先创建根注入器
-      const platformInjector = createPlatformInjector();
-      const appInjector = createApplicationInjector([
+      injectorRegistry.createRootInjector(); // 必须先创建根注入器
+      const platformInjector = injectorRegistry.createPlatformInjector();
+      const appInjector = injectorRegistry.createApplicationInjector([
         { provide: APP_TOKEN, useValue: 'app-specific' }
       ]);
       
@@ -174,10 +190,10 @@ describe('Platform 注入器支持', () => {
 
       SingletonService.resetCount();
 
-      createRootInjector(); // 必须先创建根注入器
-      const platformInjector = createPlatformInjector();
-      const app1Injector = createApplicationInjector();
-      const app2Injector = createApplicationInjector();
+      injectorRegistry.createRootInjector(); // 必须先创建根注入器
+      const platformInjector = injectorRegistry.createPlatformInjector();
+      const app1Injector = injectorRegistry.createApplicationInjector();
+      const app2Injector = injectorRegistry.createApplicationInjector();
       
       const service1 = app1Injector.get(SingletonService);
       const service2 = app2Injector.get(SingletonService);

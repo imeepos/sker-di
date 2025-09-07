@@ -19,10 +19,8 @@ describe('应用注入器自动父级测试', () => {
   });
 
   afterEach(() => {
-    // 清理测试环境
-    if (tempRootInjector) {
-      tempRootInjector.destroy();
-    }
+    // 清理所有注入器
+    injectorRegistry && injectorRegistry.destroyAll();
   });
 
   @Injectable({ providedIn: 'root' })

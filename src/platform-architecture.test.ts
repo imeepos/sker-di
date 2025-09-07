@@ -1,6 +1,9 @@
 // 使用标准的 Jest 全局变量，不需要从 @jest/globals 导入
-import { createPlatformFactory, getPlatform, destroyPlatform } from './platform-factory';
+import { createPlatformFactory } from './platform-factory';
 import { PlatformRef, PlatformModule } from './platform-ref';
+import { IPlatformManager, PLATFORM_MANAGER, PlatformManager } from './platform-manager';
+import { IInjectorRegistry, INJECTOR_REGISTRY, InjectorRegistry } from './injector-registry';
+import { EnvironmentInjector } from './environment-injector';
 import { Module, ModuleUtils, moduleResolver, MODULE_METADATA_KEY } from './module-system';
 import { 
   ExampleExtension,
@@ -73,22 +76,9 @@ const TestRouterExtension: PlatformExtension = {
 };
 
 describe('Platform Architecture 扩展性测试', () => {
-  beforeEach(() => {
-    // 重置全局状态
-    destroyPlatform();
-    moduleResolver.clear();
-    // 重置根注入器和平台注入器
-    require('./environment-injector').EnvironmentInjector.resetRootInjector();
-    // 清理全局注入器实例以适配新架构
-    (require('./environment-injector').EnvironmentInjector as any).rootInjectorInstance = null;
-    (require('./environment-injector').EnvironmentInjector as any).platformInjectorInstance = null;
-  });
-
   afterEach(() => {
-    destroyPlatform();
+    // 清理模块解析器
     moduleResolver.clear();
-    // 重置根注入器和平台注入器
-    require('./environment-injector').EnvironmentInjector.resetRootInjector();
   });
 
   describe('🏗️ 基础平台工厂功能', () => {

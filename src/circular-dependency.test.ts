@@ -2,22 +2,36 @@ import { EnvironmentInjector } from './environment-injector';
 import { Injectable } from './injectable';
 import { Inject } from './inject';
 import { InjectionToken } from './injection-token';
-import { resetRootInjector } from './index';
+import { PLATFORM_MANAGER, PlatformManager } from './index';
+import { IInjectorRegistry, INJECTOR_REGISTRY, InjectorRegistry } from './injector-registry';
 
 describe('循环依赖检测', () => {
   // 在每个测试后重置根注入器
+  let tempRootInjector: EnvironmentInjector;
+  let injectorRegistry: IInjectorRegistry;
+
+  beforeEach(() => {
+    // 创建临时根注入器用于测试
+    tempRootInjector = new EnvironmentInjector([
+      { provide: INJECTOR_REGISTRY, useClass: InjectorRegistry },
+      { provide: PLATFORM_MANAGER, useClass: PlatformManager }
+    ], undefined, 'root');
+
+    injectorRegistry = tempRootInjector.get(INJECTOR_REGISTRY);
+  });
+
   afterEach(() => {
-    resetRootInjector();
+    tempRootInjector.destroy()
   });
   it('应该检测到直接的循环依赖并抛出错误', () => {
     @Injectable({ providedIn: 'root' })
     class ServiceA {
-      constructor(@Inject('ServiceB') public serviceB: any) {}
+      constructor(@Inject('ServiceB') public serviceB: any) { }
     }
 
     @Injectable({ providedIn: 'root' })
     class ServiceB {
-      constructor(@Inject('ServiceA') public serviceA: any) {}
+      constructor(@Inject('ServiceA') public serviceA: any) { }
     }
 
     const injector = EnvironmentInjector.createWithAutoProviders([
@@ -32,17 +46,17 @@ describe('循环依赖检测', () => {
   it('应该检测到间接的循环依赖（A -> B -> C -> A）', () => {
     @Injectable({ providedIn: 'root' })
     class ServiceA {
-      constructor(@Inject('ServiceB') public serviceB: any) {}
+      constructor(@Inject('ServiceB') public serviceB: any) { }
     }
 
     @Injectable({ providedIn: 'root' })
     class ServiceB {
-      constructor(@Inject('ServiceC') public serviceC: any) {}
+      constructor(@Inject('ServiceC') public serviceC: any) { }
     }
 
     @Injectable({ providedIn: 'root' })
     class ServiceC {
-      constructor(@Inject('ServiceA') public serviceA: any) {}
+      constructor(@Inject('ServiceA') public serviceA: any) { }
     }
 
     const injector = EnvironmentInjector.createWithAutoProviders([
@@ -62,17 +76,17 @@ describe('循环依赖检测', () => {
 
     @Injectable({ providedIn: 'root' })
     class ServiceA {
-      constructor(@Inject(tokenB) public serviceB: any) {}
+      constructor(@Inject(tokenB) public serviceB: any) { }
     }
 
     @Injectable({ providedIn: 'root' })
     class ServiceB {
-      constructor(@Inject(tokenC) public serviceC: any) {}
+      constructor(@Inject(tokenC) public serviceC: any) { }
     }
 
     @Injectable({ providedIn: 'root' })
     class ServiceC {
-      constructor(@Inject(tokenA) public serviceA: any) {}
+      constructor(@Inject(tokenA) public serviceA: any) { }
     }
 
     const injector = EnvironmentInjector.createWithAutoProviders([
@@ -93,7 +107,7 @@ describe('循环依赖检测', () => {
 
     @Injectable({ providedIn: 'root' })
     class ServiceA {
-      constructor(public common: CommonService) {}
+      constructor(public common: CommonService) { }
     }
 
     @Injectable({ providedIn: 'root' })
@@ -101,10 +115,10 @@ describe('循环依赖检测', () => {
       constructor(
         public common: CommonService,
         @Inject('ServiceA') public serviceA: ServiceA
-      ) {}
+      ) { }
     }
 
-    const injector = EnvironmentInjector.createRootInjector([
+    const injector = injectorRegistry.createRootInjector([
       { provide: 'ServiceA', useClass: ServiceA }
     ]);
 
@@ -123,13 +137,13 @@ describe('循环依赖检测', () => {
     const tokenB = new InjectionToken<string>('TokenB');
 
     const injector = EnvironmentInjector.createWithAutoProviders([
-      { 
-        provide: tokenA, 
+      {
+        provide: tokenA,
         useFactory: (b: string) => `A depends on ${b}`,
         deps: [tokenB]
       },
-      { 
-        provide: tokenB, 
+      {
+        provide: tokenB,
         useFactory: (a: string) => `B depends on ${a}`,
         deps: [tokenA]
       }
@@ -145,7 +159,7 @@ describe('循环依赖检测', () => {
       value = 'normal';
     }
 
-    const injector = EnvironmentInjector.createRootInjector([]);
+    const injector = injectorRegistry.createRootInjector([]);
 
     // 第一次获取
     const service1 = injector.get(NormalService);

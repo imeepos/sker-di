@@ -7,6 +7,7 @@ import {
   PLATFORM_MANAGER,
   IPlatformManager
 } from './index';
+import { resetGlobalInjectorRegistry } from './platform-factory';
 import { EnvironmentInjector } from './environment-injector';
 import { PlatformManager } from './platform-manager';
 import { InjectorRegistry, INJECTOR_REGISTRY } from './injector-registry';
@@ -27,13 +28,15 @@ describe('新平台架构', () => {
 
   afterEach(() => {
     // 每个测试后清理平台
-    if (platformManager.hasPlatform()) {
+    if (platformManager && platformManager.hasPlatform()) {
       platformManager.destroyCurrentPlatform();
     }
     // 清理测试环境
     if (tempRootInjector) {
       tempRootInjector.destroy();
     }
+    // 重置全局注入器注册表
+    resetGlobalInjectorRegistry();
   });
 
   describe('单一平台原则', () => {
@@ -45,8 +48,9 @@ describe('新平台架构', () => {
       });
 
       const platform1 = platformFactory1();
-      expect(hasPlatform()).toBe(true);
-      expect(getPlatform()).toBe(platform1);
+      const platformManagerFromPlatform = platform1.injector.get(PLATFORM_MANAGER);
+      expect(platformManagerFromPlatform.hasPlatform()).toBe(true);
+      expect(platformManagerFromPlatform.getCurrentPlatform()).toBe(platform1);
 
       // 尝试创建第二个平台
       const platformFactory2 = createPlatformFactory(null, {
@@ -72,17 +76,19 @@ describe('新平台架构', () => {
       });
 
       const platform = platformFactory();
-      expect(hasPlatform()).toBe(true);
+      const platformManagerFromPlatform = platform.injector.get(PLATFORM_MANAGER);
+      expect(platformManagerFromPlatform.hasPlatform()).toBe(true);
 
       // 销毁平台
-      const destroyed = destroyPlatform();
+      const destroyed = platformManagerFromPlatform.destroyCurrentPlatform();
       expect(destroyed).toBe(true);
-      expect(hasPlatform()).toBe(false);
-      expect(getPlatform()).toBeNull();
+      expect(platformManagerFromPlatform.hasPlatform()).toBe(false);
+      expect(platformManagerFromPlatform.getCurrentPlatform()).toBeNull();
 
       // 重新创建平台
       const newPlatform = platformFactory();
-      expect(hasPlatform()).toBe(true);
+      const newPlatformManager = newPlatform.injector.get(PLATFORM_MANAGER);
+      expect(newPlatformManager.hasPlatform()).toBe(true);
       expect(newPlatform).not.toBe(platform); // 应该是新实例
     });
   });

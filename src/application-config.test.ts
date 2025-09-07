@@ -6,14 +6,29 @@ import {
   BaseApplicationConfig,
   ApplicationConfig
 } from './application-config';
-import { EnvironmentInjector } from './environment-injector';
+import { 
+  EnvironmentInjector,
+  INJECTOR_REGISTRY,
+  IInjectorRegistry,
+  InjectorRegistry,
+  createInjector 
+} from './index';
 import { createPlatformFactory } from './platform-factory';
 
 describe('应用配置系统', () => {
+  let registry: IInjectorRegistry;
+
+  beforeEach(() => {
+    // 创建独立的注入器注册表
+    const rootInjector = createInjector([
+      { provide: INJECTOR_REGISTRY, useClass: InjectorRegistry }
+    ], undefined, 'root');
+    registry = rootInjector.get(INJECTOR_REGISTRY);
+  });
+
   afterEach(() => {
-    // 清理全局实例
-    (EnvironmentInjector as any).rootInjectorInstance = null;
-    (EnvironmentInjector as any).platformInjectorInstance = null;
+    // 清理所有注入器
+    registry && registry.destroyAll();
   });
 
   describe('provideApplicationConfig', () => {
@@ -28,9 +43,9 @@ describe('应用配置系统', () => {
       const providers = provideApplicationConfig(appConfig);
       
       // 首先创建平台注入器
-      EnvironmentInjector.createRootInjector([]);
-      const platformInjector = EnvironmentInjector.createPlatformInjector([]);
-      const injector = EnvironmentInjector.createApplicationInjector(providers);
+      registry.createRootInjector([]);
+      const platformInjector = registry.createPlatformInjector([]);
+      const injector = registry.createApplicationInjector(providers);
 
       // 验证基础配置
       const baseConfig = injector.get(APPLICATION_CONFIG);
@@ -54,9 +69,9 @@ describe('应用配置系统', () => {
 
       const providers = provideApplicationConfig(minimalConfig);
       
-      EnvironmentInjector.createRootInjector([]);
-      const platformInjector = EnvironmentInjector.createPlatformInjector([]);
-      const injector = EnvironmentInjector.createApplicationInjector(providers);
+      registry.createRootInjector([]);
+      const platformInjector = registry.createPlatformInjector([]);
+      const injector = registry.createApplicationInjector(providers);
 
       const baseConfig = injector.get(APPLICATION_CONFIG);
       expect(baseConfig.name).toBe('minimal-app');
@@ -84,9 +99,9 @@ describe('应用配置系统', () => {
       const providers = provideApplicationConfigFactory(factory);
       
       // 首先创建平台注入器
-      EnvironmentInjector.createRootInjector([]);
-      const platformInjector = EnvironmentInjector.createPlatformInjector([]);
-      const injector = EnvironmentInjector.createApplicationInjector(providers);
+      registry.createRootInjector([]);
+      const platformInjector = registry.createPlatformInjector([]);
+      const injector = registry.createApplicationInjector(providers);
 
       // 第一次获取配置
       const config1 = injector.get(APPLICATION_CONFIG);
@@ -104,11 +119,8 @@ describe('应用配置系统', () => {
 });
 
 describe('平台应用配置集成', () => {
-  afterEach(() => {
-    // 清理全局实例
-    (EnvironmentInjector as any).rootInjectorInstance = null;
-    (EnvironmentInjector as any).platformInjectorInstance = null;
-  });
+  // 这些测试使用平台工厂，无需清理
+
   it('应该能够通过新配置系统引导应用', async () => {
     // 创建平台
     const platformFactory = createPlatformFactory(null, {

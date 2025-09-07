@@ -1,12 +1,26 @@
 import { EnvironmentInjector } from './environment-injector';
 import { Injectable } from './injectable';
 import { OnDestroy, isOnDestroy } from './lifecycle';
-import { resetRootInjector } from './index';
+import { IInjectorRegistry, INJECTOR_REGISTRY, InjectorRegistry } from './injector-registry';
+import { IPlatformManager, PLATFORM_MANAGER, PlatformManager } from './platform-manager';
 
 describe('生命周期管理', () => {
-  // 在每个测试后重置根注入器
+  let tempRootInjector: EnvironmentInjector;
+  let injectorRegistry: IInjectorRegistry;
+
+  beforeEach(() => {
+    // 创建临时根注入器用于测试
+    tempRootInjector = new EnvironmentInjector([
+      { provide: INJECTOR_REGISTRY, useClass: InjectorRegistry },
+      { provide: PLATFORM_MANAGER, useClass: PlatformManager }
+    ], undefined, 'root');
+    
+    injectorRegistry = tempRootInjector.get(INJECTOR_REGISTRY);
+  });
+
   afterEach(() => {
-    resetRootInjector();
+    // 清理所有注入器
+    injectorRegistry && injectorRegistry.destroyAll();
   });
   it('应该在服务销毁时调用 ngOnDestroy', () => {
     const destroySpy = jest.fn();
@@ -18,7 +32,7 @@ describe('生命周期管理', () => {
       }
     }
 
-    const injector = EnvironmentInjector.createRootInjector([]);
+    const injector = injectorRegistry.createRootInjector([]);
     const service = injector.get(ServiceWithDestroy);
 
     expect(service).toBeInstanceOf(ServiceWithDestroy);
@@ -47,7 +61,7 @@ describe('生命周期管理', () => {
       }
     }
 
-    const injector = EnvironmentInjector.createRootInjector([]);
+    const injector = injectorRegistry.createRootInjector([]);
     
     // 获取两个服务实例
     injector.get(Service1);
@@ -69,7 +83,7 @@ describe('生命周期管理', () => {
       value = 'test';
     }
 
-    const injector = EnvironmentInjector.createRootInjector([]);
+    const injector = injectorRegistry.createRootInjector([]);
     const service = injector.get(ServiceWithoutDestroy);
 
     expect(service).toBeInstanceOf(ServiceWithoutDestroy);
@@ -106,7 +120,7 @@ describe('生命周期管理', () => {
       }
     }
 
-    const injector = EnvironmentInjector.createRootInjector([]);
+    const injector = injectorRegistry.createRootInjector([]);
     
     injector.get(Service1);
     injector.get(Service2);
@@ -131,7 +145,7 @@ describe('生命周期管理', () => {
       }
     }
 
-    const injector = EnvironmentInjector.createRootInjector([]);
+    const injector = injectorRegistry.createRootInjector([]);
     injector.get(ServiceWithDestroy);
 
     // 第一次销毁
@@ -149,7 +163,7 @@ describe('生命周期管理', () => {
       value = 'test';
     }
 
-    const injector = EnvironmentInjector.createRootInjector([]);
+    const injector = injectorRegistry.createRootInjector([]);
     const service = injector.get(TestService);
     expect(service).toBeInstanceOf(TestService);
 

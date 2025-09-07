@@ -21,10 +21,8 @@ describe('高级注入选项', () => {
   });
 
   afterEach(() => {
-    // 清理测试环境
-    if (tempRootInjector) {
-      tempRootInjector.destroy();
-    }
+    // 清理所有注入器
+    injectorRegistry && injectorRegistry.destroyAll();
   });
   describe('skipSelf 选项', () => {
     it('应该跳过当前注入器，从父注入器查找', () => {
@@ -64,7 +62,7 @@ describe('高级注入选项', () => {
       }
 
       // 创建祖父注入器（根注入器）
-      const grandparentInjector = EnvironmentInjector.createRootInjector([
+      const grandparentInjector = injectorRegistry.createRootInjector([
         { provide: TOKEN, useValue: 'grandparent-value' }
       ]);
 
@@ -91,7 +89,7 @@ describe('高级注入选项', () => {
         ) {}
       }
 
-      const childInjector = EnvironmentInjector.createRootInjector([
+      const childInjector = injectorRegistry.createRootInjector([
         { provide: TestService, useClass: TestService },
         { provide: TOKEN, useValue: 'child-value' }
       ]);
@@ -135,7 +133,7 @@ describe('高级注入选项', () => {
         ) {}
       }
 
-      const parentInjector = EnvironmentInjector.createRootInjector([
+      const parentInjector = injectorRegistry.createRootInjector([
         { provide: TOKEN, useValue: 'parent-value' }
       ]);
 
@@ -158,7 +156,7 @@ describe('高级注入选项', () => {
         ) {}
       }
 
-      const parentInjector = EnvironmentInjector.createRootInjector([
+      const parentInjector = injectorRegistry.createRootInjector([
         { provide: TOKEN, useValue: 'parent-value' }
       ]);
 
@@ -184,7 +182,7 @@ describe('高级注入选项', () => {
       }
 
       // 创建宿主注入器（根注入器）
-      const hostInjector = EnvironmentInjector.createRootInjector([
+      const hostInjector = injectorRegistry.createRootInjector([
         { provide: TOKEN, useValue: 'host-value' }
       ]);
 
@@ -214,7 +212,7 @@ describe('高级注入选项', () => {
       }
 
       // 创建子注入器，提供服务但不提供TOKEN
-      const childInjector = EnvironmentInjector.createRootInjector([
+      const childInjector = injectorRegistry.createRootInjector([
         { provide: TestService, useClass: TestService }
         // 注意：这里没有提供 TOKEN
       ]);

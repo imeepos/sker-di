@@ -2,14 +2,27 @@ import { EnvironmentInjector } from './environment-injector';
 import { Injectable } from './injectable';
 import { Inject } from './inject';
 import { InjectionToken } from './injection-token';
-import { resetRootInjector } from './index';
+import { IInjectorRegistry, INJECTOR_REGISTRY, InjectorRegistry } from './injector-registry';
+import { IPlatformManager, PLATFORM_MANAGER, PlatformManager } from './platform-manager';
 
 describe('providedIn 选项支持', () => {
   const testToken = new InjectionToken<string>('测试令牌');
+  let tempRootInjector: EnvironmentInjector;
+  let injectorRegistry: IInjectorRegistry;
 
-  // 在每个测试后重置根注入器
+  beforeEach(() => {
+    // 创建临时根注入器用于测试
+    tempRootInjector = new EnvironmentInjector([
+      { provide: INJECTOR_REGISTRY, useClass: InjectorRegistry },
+      { provide: PLATFORM_MANAGER, useClass: PlatformManager }
+    ], undefined, 'root');
+    
+    injectorRegistry = tempRootInjector.get(INJECTOR_REGISTRY);
+  });
+
   afterEach(() => {
-    resetRootInjector();
+    // 清理所有注入器
+    injectorRegistry && injectorRegistry.destroyAll();
   });
 
   it('providedIn: "root" 的服务应该能在根注入器中自动注册', () => {
@@ -19,7 +32,7 @@ describe('providedIn 选项支持', () => {
     }
 
     // 创建根注入器来测试 providedIn: 'root' 的服务
-    const injector = EnvironmentInjector.createRootInjector([]);
+    const injector = injectorRegistry.createRootInjector([]);
 
     const service = injector.get(RootService);
     expect(service).toBeInstanceOf(RootService);
@@ -45,7 +58,7 @@ describe('providedIn 选项支持', () => {
     })
     class FactoryService {}
 
-    const injector = EnvironmentInjector.createRootInjector([]);
+    const injector = injectorRegistry.createRootInjector([]);
 
     const service = injector.get(FactoryService);
     expect(service).toEqual({ factoryValue: 'created-by-factory' });
@@ -62,7 +75,7 @@ describe('providedIn 选项支持', () => {
       constructor(public dep: DependencyService) {}
     }
 
-    const injector = EnvironmentInjector.createRootInjector([]);
+    const injector = injectorRegistry.createRootInjector([]);
 
     const service = injector.get(ServiceWithDep);
     expect(service).toBeInstanceOf(ServiceWithDep);
@@ -80,7 +93,7 @@ describe('providedIn 选项支持', () => {
       constructor(@Inject(testToken) public value: string) {}
     }
 
-    const injector = EnvironmentInjector.createRootInjector(providers);
+    const injector = injectorRegistry.createRootInjector(providers);
 
     const service = injector.get(ServiceWithInject);
     expect(service).toBeInstanceOf(ServiceWithInject);

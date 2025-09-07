@@ -3,14 +3,27 @@ import { Injectable } from './injectable';
 import { Inject } from './inject';
 import { InjectionToken } from './injection-token';
 import { InjectOptions } from './inject-options';
-import { resetRootInjector } from './index';
+import { IInjectorRegistry, INJECTOR_REGISTRY, InjectorRegistry } from './injector-registry';
+import { IPlatformManager, PLATFORM_MANAGER, PlatformManager } from './platform-manager';
 
 describe('注入选项控制 (InjectOptions)', () => {
   const testToken = new InjectionToken<string>('测试令牌');
+  let tempRootInjector: EnvironmentInjector;
+  let injectorRegistry: IInjectorRegistry;
 
-  // 在每个测试后重置根注入器
+  beforeEach(() => {
+    // 创建临时根注入器用于测试
+    tempRootInjector = new EnvironmentInjector([
+      { provide: INJECTOR_REGISTRY, useClass: InjectorRegistry },
+      { provide: PLATFORM_MANAGER, useClass: PlatformManager }
+    ], undefined, 'root');
+    
+    injectorRegistry = tempRootInjector.get(INJECTOR_REGISTRY);
+  });
+
   afterEach(() => {
-    resetRootInjector();
+    // 清理所有注入器
+    injectorRegistry && injectorRegistry.destroyAll();
   });
   
   it('optional: true - 当依赖不存在时应返回 null 而不是抛出错误', () => {
@@ -21,7 +34,7 @@ describe('注入选项控制 (InjectOptions)', () => {
       ) {}
     }
 
-    const injector = EnvironmentInjector.createRootInjector([]);
+    const injector = injectorRegistry.createRootInjector([]);
 
     const service = injector.get(ServiceWithOptional);
     expect(service).toBeInstanceOf(ServiceWithOptional);
@@ -60,7 +73,7 @@ describe('注入选项控制 (InjectOptions)', () => {
       ) {}
     }
 
-    const injector = EnvironmentInjector.createRootInjector([]);
+    const injector = injectorRegistry.createRootInjector([]);
 
     const service = injector.get(ServiceWithCombinedOptions);
     expect(service).toBeInstanceOf(ServiceWithCombinedOptions);
