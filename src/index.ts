@@ -51,16 +51,13 @@ export {
   validateInjectOptionsConflicts,
   flagsToString
 } from './internal-inject-flags';
-export { OnDestroy, isOnDestroy } from './lifecycle';
+export { OnDestroy, isOnDestroy, OnInit, isOnInit, OnInstall, isOnInstall, OnUnInstall, isOnUnInstall, OnUpgrade, isOnUpgrade } from './lifecycle';
 export { runInInjectionContext, getCurrentInjectionContext, assertInInjectionContext } from './injection-context';
 export { forwardRef, ForwardRef, isForwardRef, resolveForwardRef } from './forward-ref';
 
 // 调试和开发工具
 export {
   DIDebugger,
-  getDebugger,
-  enableDevMode,
-  disableDebug,
   DebugLevel,
   DebugEventType,
   DebugEvent,
@@ -74,13 +71,6 @@ export {
 export {
   DIInspector,
   IDIInspector,
-  DI_INSPECTOR,
-  getInspector,
-  printHierarchy,
-  printStats,
-  searchTokens,
-  healthCheck,
-  generateReport
 } from './debug-inspector';
 
 // 循环依赖检测功能已内置在 EnvironmentInjector 中
@@ -105,68 +95,22 @@ export function createInjector(providers: Provider[], parent: Injector = NULL_IN
   return EnvironmentInjector.createWithAutoProviders(providers, parent, scope);
 }
 
-// 移除全局静态管理函数，请使用以下DI服务：
-// - InjectorRegistry: 管理注入器生命周期
-// - PlatformManager: 管理平台实例
-//
-// 示例用法：
-// const injectorRegistry = injector.get(INJECTOR_REGISTRY);
-// const rootInjector = injectorRegistry.createRootInjector(providers);
-// const platformInjector = injectorRegistry.createPlatformInjector(providers);
-// const appInjector = injectorRegistry.createApplicationInjector(providers);
-//
-// const platformManager = injector.get(PLATFORM_MANAGER);
-// const currentPlatform = platformManager.getCurrentPlatform();
-
-// 移除的全局函数（违反DI原则）：
-// - createRootInjector
-// - getRootInjector  
-// - resetRootInjector
-// - createPlatformInjector
-// - getPlatformInjector
-// - resetPlatformInjector
-// - createApplicationInjector
-// - createFeatureInjector
-
 // ============================================================================
-// 🚀 平台架构系统 (扩展性增强)
+// 🚀 插件化架构系统 (一切皆服务，一切皆可注入)
 // ============================================================================
 
 
 // 应用管理系统
 export {
-  ApplicationRef,
-  ApplicationState,
-  ApplicationFeature,
-  ApplicationManager,
+  ApplicationRef
 } from './application-manager';
-
-// Feature引用系统
-export {
-  FeatureRef,
-  FeatureState,
-  DefaultFeatureRef,
-  createFeatureRef
-} from './feature-ref';
 
 // 平台工厂和管理
 export {
-  createPlatformFactory
-  // 移除全局函数：getPlatform, destroyPlatform, hasPlatform
-  // 请使用 PlatformManager 服务进行DI管理
+  createPlatformFactory,
+  PlatformRef,
+  PlatformFactory
 } from './platform-factory';
-
-// 应用配置系统（保持平台无关性）
-export {
-  ApplicationConfig,
-  BaseApplicationConfig,
-  ApplicationBootstrapContext,
-  ApplicationConfigFactory,
-  APPLICATION_CONFIG,
-  APPLICATION_BOOTSTRAP_CONTEXT,
-  provideApplicationConfig,
-  provideApplicationConfigFactory
-} from './application-config';
 
 // 模块系统
 export {
@@ -180,3 +124,27 @@ export {
   isModule,
   MODULE_METADATA_KEY,
 } from './module-system';
+
+// 存储系统
+export {
+  Storage,
+  Application,
+  PlatformStorage
+} from './storage';
+
+// 内存存储实现
+export {
+  MemoryStorage,
+  MemoryPlatformStorage
+} from './memory-storage';
+
+// 根注入器
+export {
+  rootInjector
+} from './root';
+
+// 令牌定义
+export {
+  PLATFORM_INITITATION,
+  APPLICATION_INITITATION
+} from './tokens';

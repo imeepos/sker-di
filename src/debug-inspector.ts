@@ -4,9 +4,7 @@ import {
   ProviderDebugInfo,
   InstanceDebugInfo,
 } from './debug';
-import { Injectable } from './injectable';
 import { Inject } from './inject';
-import { InjectionToken } from './injection-token';
 
 /**
  * DI检查器接口
@@ -21,12 +19,6 @@ export interface IDIInspector {
   generateReport(injector?: any): string;
   searchTokens(pattern: string): string;
 }
-
-/**
- * DI检查器注入令牌
- */
-export const DI_INSPECTOR = new InjectionToken<IDIInspector>('DI_INSPECTOR');
-
 /**
  * 依赖注入调试检查器
  * 提供注入器状态检查和可视化工具

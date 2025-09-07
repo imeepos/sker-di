@@ -81,7 +81,6 @@ export class PlatformRef {
     const resolvedModule = resolver.resolve(type)
     const providers = resolvedModule.providers
     const injector = EnvironmentInjector.createWithAutoProviders([
-      ...providers,
       { provide: type, useClass: type },
       {
         provide: ApplicationRef, useFactory: (injector: Injector) => {
@@ -93,7 +92,8 @@ export class PlatformRef {
           return storage.createApplicationStorage(id)
         },
         deps: [PlatformStorage]
-      }
+      },
+      ...providers,
     ], this.platformInjector, 'application')
     const ref = injector.get(ApplicationRef)
     this._applications.set(id, ref)
@@ -117,14 +117,14 @@ export function createPlatformFactory<T>(
   return function platformFactory(extraProviders: Provider[] = []): PlatformRef {
     const resolver = rootInjector.get(ModuleResolver)
     const moduleResolver = resolver.resolve(module)
-    const providers = [...moduleResolver.providers, ...extraProviders]
+    const providers = [...extraProviders, ...moduleResolver.providers]
     if (parentFactory) {
       return parentFactory(providers)
     } else {
       const platformInjector = EnvironmentInjector.createWithAutoProviders([
-        ...providers,
         { provide: PlatformRef, useClass: PlatformRef },
-        { provide: PlatformStorage, useClass: MemoryPlatformStorage }
+        { provide: PlatformStorage, useClass: MemoryPlatformStorage },
+        ...providers,
       ], rootInjector, 'platform')
       return platformInjector.get(PlatformRef)
     }
