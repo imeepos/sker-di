@@ -203,8 +203,6 @@ describe('EnvironmentInjectorUtils', () => {
         expect(EnvironmentInjectorUtils.getProviderType({ provide: 'test', useClass: String })).toBe('ClassProvider');
         expect(EnvironmentInjectorUtils.getProviderType({ provide: 'test', useFactory: () => 'test' })).toBe('FactoryProvider');
         expect(EnvironmentInjectorUtils.getProviderType({ provide: 'test', useExisting: 'other' })).toBe('ExistingProvider');
-        expect(EnvironmentInjectorUtils.getProviderType({ provide: 'test', useLazyClass: String })).toBe('LazyClassProvider');
-        expect(EnvironmentInjectorUtils.getProviderType({ provide: 'test', useLazyFactory: () => 'test' })).toBe('LazyFactoryProvider');
         expect(EnvironmentInjectorUtils.getProviderType({ provide: String })).toBe('ConstructorProvider');
       });
     });

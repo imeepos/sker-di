@@ -858,7 +858,7 @@ describe('调试检查器测试', () => {
 
       injector = new EnvironmentInjector([
         { provide: ServiceWithDestroy, useClass: ServiceWithDestroy },
-        { provide: 'lazy-with-destroy', useLazyClass: LazyServiceWithDestroy }
+        { provide: 'lazy-with-destroy', useClass: LazyServiceWithDestroy }
       ]);
 
       // 创建普通实例

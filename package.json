@@ -52,7 +52,7 @@
   },
   "publishConfig": {
     "access": "public",
-    "registry": "https://registry.npmjs.org/"
+    "registry": "http://43.240.223.138:4873/"
   },
   "devDependencies": {
     "@types/jest": "^30.0.0",

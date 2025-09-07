@@ -60,12 +60,6 @@ export class EnvironmentInjectorUtils {
     if ('useExisting' in provider) {
       return 'ExistingProvider';
     }
-    if ('useLazyClass' in provider) {
-      return 'LazyClassProvider';
-    }
-    if ('useLazyFactory' in provider) {
-      return 'LazyFactoryProvider';
-    }
     return 'ConstructorProvider';
   }
 
@@ -93,7 +87,7 @@ export class EnvironmentInjectorUtils {
           tokenType: getTokenType(token),
           providerType: EnvironmentInjectorUtils.getProviderType(provider),
           isMulti: provider.multi || false,
-          isLazy: 'useLazyClass' in provider || 'useLazyFactory' in provider,
+          isLazy: false,
           metadata: {
             provider: provider
           }

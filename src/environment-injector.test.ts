@@ -681,21 +681,21 @@ describe('EnvironmentInjector', () => {
         expect(snapshot.instances).toHaveLength(0);
       });
 
-      it('应该正确处理延迟实例的调试信息', () => {
+      it('应该正确处理普通实例的调试信息', () => {
         class LazyService {
           value = 'lazy';
         }
 
         injector = new EnvironmentInjector([
-          { provide: LazyService, useLazyClass: LazyService }
+          { provide: LazyService, useClass: LazyService }
         ]);
         
-        // 获取延迟实例
+        // 获取实例
         const instance = injector.get(LazyService);
         expect(instance.value).toBe('lazy');
         
         const snapshot = injector.getDebugSnapshot();
-        expect(snapshot.instances.some(info => info.isLazy)).toBe(true);
+        expect(snapshot.instances.some(info => !info.isLazy)).toBe(true);
       });
 
       it('应该正确识别不同的提供者类型', () => {
@@ -706,8 +706,6 @@ describe('EnvironmentInjector', () => {
           { provide: 'CLASS_TOKEN', useClass: TestService },
           { provide: 'FACTORY_TOKEN', useFactory: factoryFn },
           { provide: 'EXISTING_TOKEN', useExisting: 'VALUE_TOKEN' },
-          { provide: 'LAZY_CLASS_TOKEN', useLazyClass: TestService },
-          { provide: 'LAZY_FACTORY_TOKEN', useLazyFactory: factoryFn },
           { provide: TestService, useClass: TestService } // ConstructorProvider
         ]);
         
@@ -1302,28 +1300,28 @@ describe('EnvironmentInjector', () => {
       expect(result).toBe('test-value');
     });
 
-    it('应该测试懒加载类和工厂提供者的类型识别', () => {
-      // 🔴 测试第721-726行：LazyClassProvider和LazyFactoryProvider类型
-      class LazyService {
-        value = 'lazy';
+    it('应该测试类和工厂提供者的类型识别', () => {
+      // 测试 ClassProvider 和 FactoryProvider 类型
+      class TestService {
+        value = 'test';
       }
 
       const injector = new EnvironmentInjector([
         { 
-          provide: 'lazy-class',
-          useLazyClass: LazyService
+          provide: 'class-token',
+          useClass: TestService
         },
         {
-          provide: 'lazy-factory',
-          useLazyFactory: () => new LazyService()
+          provide: 'factory-token',
+          useFactory: () => new TestService()
         }
       ]);
 
-      const lazyClassInstance = injector.get('lazy-class');
-      expect(lazyClassInstance).toBeInstanceOf(LazyService);
+      const classInstance = injector.get('class-token');
+      expect(classInstance).toBeInstanceOf(TestService);
 
-      const lazyFactoryInstance = injector.get('lazy-factory');  
-      expect(lazyFactoryInstance).toBeInstanceOf(LazyService);
+      const factoryInstance = injector.get('factory-token');  
+      expect(factoryInstance).toBeInstanceOf(TestService);
     });
 
     it('应该测试非EnvironmentInjector宿主注入器的委托', () => {
@@ -1592,29 +1590,29 @@ describe('EnvironmentInjector', () => {
       expect((injector as any).getTokenType([])).toBe('InjectionToken');
     });
 
-    it('应该测试getProviderType方法中LazyProvider类型分支', () => {
-      // 🔴 测试第721-726行：LazyClassProvider 和 LazyFactoryProvider 类型识别
-      class LazyTestService {
-        value = 'lazy-test';
+    it('应该测试getProviderType方法中基础Provider类型分支', () => {
+      // 测试 ClassProvider 和 FactoryProvider 类型识别
+      class TestService {
+        value = 'test';
       }
 
-      const lazyClassProvider = {
-        provide: 'lazy-class-token',
-        useLazyClass: LazyTestService
+      const classProvider = {
+        provide: 'class-token',
+        useClass: TestService
       };
 
-      const lazyFactoryProvider = {
-        provide: 'lazy-factory-token', 
-        useLazyFactory: () => new LazyTestService()
+      const factoryProvider = {
+        provide: 'factory-token', 
+        useFactory: () => new TestService()
       };
 
       const injector = new EnvironmentInjector([]);
 
-      // 测试 LazyClassProvider 类型识别
-      expect((injector as any).getProviderType(lazyClassProvider)).toBe('LazyClassProvider');
+      // 测试 ClassProvider 类型识别
+      expect((injector as any).getProviderType(classProvider)).toBe('ClassProvider');
 
-      // 测试 LazyFactoryProvider 类型识别
-      expect((injector as any).getProviderType(lazyFactoryProvider)).toBe('LazyFactoryProvider');
+      // 测试 FactoryProvider 类型识别
+      expect((injector as any).getProviderType(factoryProvider)).toBe('FactoryProvider');
     });
 
     it('应该测试所有提供者类型的完整覆盖', () => {
@@ -1630,8 +1628,6 @@ describe('EnvironmentInjector', () => {
         { provide: 'token2', useClass: TestClass },
         { provide: 'token3', useFactory: testFactory },
         { provide: 'token4', useExisting: 'token1' },
-        { provide: 'token5', useLazyClass: TestClass },
-        { provide: 'token6', useLazyFactory: testFactory },
         { provide: TestClass } // ConstructorProvider
       ];
 
@@ -1640,8 +1636,6 @@ describe('EnvironmentInjector', () => {
         'ClassProvider', 
         'FactoryProvider',
         'ExistingProvider',
-        'LazyClassProvider',
-        'LazyFactoryProvider',
         'ConstructorProvider'
       ];
 
