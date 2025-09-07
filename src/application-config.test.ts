@@ -3,11 +3,8 @@ import {
   provideApplicationConfigFactory,
   APPLICATION_CONFIG, 
   APPLICATION_BOOTSTRAP_CONTEXT,
-  WEB_APPLICATION_CONFIG,
-  MICROSERVICE_APPLICATION_CONFIG,
   BaseApplicationConfig,
-  WebApplicationConfig,
-  MicroserviceApplicationConfig 
+  ApplicationConfig
 } from './application-config';
 import { EnvironmentInjector } from './environment-injector';
 import { createPlatformFactory } from './platform-factory';
@@ -20,17 +17,15 @@ describe('应用配置系统', () => {
   });
 
   describe('provideApplicationConfig', () => {
-    it('应该为Web应用提供正确的配置', () => {
-      const webConfig: WebApplicationConfig = {
-        type: 'web',
-        name: 'my-web-app',
+    it('应该提供基础应用配置', () => {
+      const appConfig: ApplicationConfig = {
+        name: 'my-app',
         enableDebug: true,
-        selector: '#app',
-        enableRouting: true,
-        basePath: '/web'
+        version: '1.0.0',
+        environment: 'development'
       };
 
-      const providers = provideApplicationConfig(webConfig);
+      const providers = provideApplicationConfig(appConfig);
       
       // 首先创建平台注入器
       EnvironmentInjector.createRootInjector([]);
@@ -39,15 +34,10 @@ describe('应用配置系统', () => {
 
       // 验证基础配置
       const baseConfig = injector.get(APPLICATION_CONFIG);
-      expect(baseConfig.name).toBe('my-web-app');
+      expect(baseConfig.name).toBe('my-app');
       expect(baseConfig.enableDebug).toBe(true);
-
-      // 验证Web特定配置
-      const specificConfig = injector.get(WEB_APPLICATION_CONFIG);
-      expect(specificConfig.type).toBe('web');
-      expect(specificConfig.selector).toBe('#app');
-      expect(specificConfig.enableRouting).toBe(true);
-      expect(specificConfig.basePath).toBe('/web');
+      expect(baseConfig.version).toBe('1.0.0');
+      expect(baseConfig.environment).toBe('development');
 
       // 验证启动上下文
       const bootstrapContext = injector.get(APPLICATION_BOOTSTRAP_CONTEXT);
@@ -57,34 +47,22 @@ describe('应用配置系统', () => {
       injector.destroy();
     });
 
-    it('应该为微服务应用提供正确的配置', () => {
-      const microserviceConfig: MicroserviceApplicationConfig = {
-        type: 'microservice',
-        name: 'my-api-service',
-        port: 3000,
-        host: 'localhost',
-        apiPrefix: '/api/v1',
-        maxRequestSize: 1024
+    it('应该支持最小配置', () => {
+      const minimalConfig: ApplicationConfig = {
+        name: 'minimal-app'
       };
 
-      const providers = provideApplicationConfig(microserviceConfig);
+      const providers = provideApplicationConfig(minimalConfig);
       
-      // 首先创建平台注入器
       EnvironmentInjector.createRootInjector([]);
       const platformInjector = EnvironmentInjector.createPlatformInjector([]);
       const injector = EnvironmentInjector.createApplicationInjector(providers);
 
-      // 验证基础配置
       const baseConfig = injector.get(APPLICATION_CONFIG);
-      expect(baseConfig.name).toBe('my-api-service');
-
-      // 验证微服务特定配置
-      const specificConfig = injector.get(MICROSERVICE_APPLICATION_CONFIG);
-      expect(specificConfig.type).toBe('microservice');
-      expect(specificConfig.port).toBe(3000);
-      expect(specificConfig.host).toBe('localhost');
-      expect(specificConfig.apiPrefix).toBe('/api/v1');
-      expect(specificConfig.maxRequestSize).toBe(1024);
+      expect(baseConfig.name).toBe('minimal-app');
+      expect(baseConfig.enableDebug).toBeUndefined();
+      expect(baseConfig.version).toBeUndefined();
+      expect(baseConfig.environment).toBeUndefined();
 
       injector.destroy();
     });
@@ -97,10 +75,9 @@ describe('应用配置系统', () => {
       const factory = () => {
         configCallCount++;
         return {
-          type: 'web' as const,
           name: `dynamic-app-${configCallCount}`,
           enableDebug: configCallCount === 1,
-          selector: '#dynamic-app'
+          version: '1.0.0'
         };
       };
 
@@ -142,28 +119,25 @@ describe('平台应用配置集成', () => {
     const platform = platformFactory();
 
     // 使用新配置系统
-    const webConfig: WebApplicationConfig = {
-      type: 'web',
+    const appConfig: ApplicationConfig = {
       name: 'config-test-app',
       enableDebug: true,
-      selector: '#test-app',
-      enableRouting: false
+      version: '1.0.0',
+      environment: 'test'
     };
 
     const app = await platform.bootstrapApplication([
-      ...provideApplicationConfig(webConfig),
+      ...provideApplicationConfig(appConfig),
       // 其他应用提供者
       { provide: 'TEST_SERVICE', useValue: 'test-service-value' }
     ]);
 
     // 验证应用可以注入配置
-    const appConfig = app.injector.get(APPLICATION_CONFIG);
-    expect(appConfig.name).toBe('config-test-app');
-    expect(appConfig.enableDebug).toBe(true);
-
-    const webAppConfig = app.injector.get(WEB_APPLICATION_CONFIG);
-    expect(webAppConfig.selector).toBe('#test-app');
-    expect(webAppConfig.enableRouting).toBe(false);
+    const retrievedConfig = app.injector.get(APPLICATION_CONFIG);
+    expect(retrievedConfig.name).toBe('config-test-app');
+    expect(retrievedConfig.enableDebug).toBe(true);
+    expect(retrievedConfig.version).toBe('1.0.0');
+    expect(retrievedConfig.environment).toBe('test');
 
     const bootstrapContext = app.injector.get(APPLICATION_BOOTSTRAP_CONTEXT);
     expect(bootstrapContext.platformName).toBe('test-platform');
@@ -191,8 +165,8 @@ describe('平台应用配置集成', () => {
     ]);
 
     // 验证默认配置被提供
-    const appConfig = app.injector.get(APPLICATION_CONFIG);
-    expect(appConfig.name).toMatch(/^app-\d+$/); // 格式: app-{timestamp}
+    const retrievedConfig = app.injector.get(APPLICATION_CONFIG);
+    expect(retrievedConfig.name).toMatch(/^app-\d+$/); // 格式: app-{timestamp}
 
     const bootstrapContext = app.injector.get(APPLICATION_BOOTSTRAP_CONTEXT);
     expect(bootstrapContext.platformName).toBe('default-platform');

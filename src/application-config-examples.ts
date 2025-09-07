@@ -7,47 +7,39 @@ import {
   createPlatformFactory,
   provideApplicationConfig,
   provideApplicationConfigFactory,
-  WebApplicationConfig,
-  MicroserviceApplicationConfig,
+  ApplicationConfig,
   APPLICATION_CONFIG,
   APPLICATION_BOOTSTRAP_CONTEXT,
-  WEB_APPLICATION_CONFIG,
-  MICROSERVICE_APPLICATION_CONFIG,
   inject
 } from './index';
 
 // =============================================
-// 示例1: Web应用配置
+// 示例1: 基础应用配置
 // =============================================
 
-export async function webApplicationExample() {
-  console.log('=== Web应用配置示例 ===');
+export async function basicApplicationExample() {
+  console.log('=== 基础应用配置示例 ===');
   
-  // 1. 定义Web应用配置
-  const webConfig: WebApplicationConfig = {
-    type: 'web',
-    name: 'my-spa-app',
+  // 1. 定义通用应用配置
+  const appConfig: ApplicationConfig = {
+    name: 'my-universal-app',
     version: '1.0.0',
     environment: 'production',
-    enableDebug: false,
-    selector: '#root',
-    enableRouting: true,
-    basePath: '/app',
-    assetsPath: '/static'
+    enableDebug: false
   };
 
   // 2. 创建平台
-  const webPlatformFactory = createPlatformFactory(null, {
-    config: { name: 'web-platform', version: '1.0.0' },
+  const platformFactory = createPlatformFactory(null, {
+    config: { name: 'universal-platform', version: '1.0.0' },
     providers: []
   });
   
-  const platform = webPlatformFactory();
+  const platform = platformFactory();
 
   // 3. 使用新的配置系统引导应用
   const app = await platform.bootstrapApplication([
     // 提供应用配置
-    ...provideApplicationConfig(webConfig),
+    ...provideApplicationConfig(appConfig),
     
     // 其他业务服务
     { provide: 'ROUTER_SERVICE', useClass: RouterService },
@@ -55,24 +47,24 @@ export async function webApplicationExample() {
   ]);
 
   // 4. 在应用内部使用配置
-  class MyWebComponent {
+  class MyAppComponent {
     constructor(
-      @inject(APPLICATION_CONFIG) private config: WebApplicationConfig,
-      @inject(WEB_APPLICATION_CONFIG) private webConfig: WebApplicationConfig,
+      @inject(APPLICATION_CONFIG) private config: ApplicationConfig,
       @inject(APPLICATION_BOOTSTRAP_CONTEXT) private context: any,
       @inject('ROUTER_SERVICE') private router: RouterService
     ) {}
 
     initialize() {
       console.log(`应用名称: ${this.config.name}`);
-      console.log(`DOM选择器: ${this.webConfig.selector}`);
+      console.log(`版本: ${this.config.version}`);
+      console.log(`环境: ${this.config.environment}`);
       console.log(`启动时间: ${new Date(this.context.bootstrapTime)}`);
       console.log(`平台: ${this.context.platformName}`);
     }
   }
 
   // 注册组件并启动
-  const component = app.bootstrap(MyWebComponent);
+  const component = app.bootstrap(MyAppComponent);
   component.initialize();
 
   app.destroy();
@@ -80,52 +72,50 @@ export async function webApplicationExample() {
 }
 
 // =============================================
-// 示例2: 微服务应用配置
+// 示例2: 带扩展配置的应用
 // =============================================
 
-export async function microserviceApplicationExample() {
-  console.log('\n=== 微服务应用配置示例 ===');
+export async function extendedApplicationExample() {
+  console.log('\n=== 扩展应用配置示例 ===');
 
-  // 1. 定义微服务配置
-  const microConfig: MicroserviceApplicationConfig = {
-    type: 'microservice',
-    name: 'user-service',
+  // 1. 定义扩展配置（使用自定义属性）
+  const appConfig: ApplicationConfig & { port?: number; host?: string } = {
+    name: 'extended-service',
     version: '2.1.0',
     environment: 'development',
     enableDebug: true,
+    // 自定义扩展属性
     port: 3000,
-    host: 'localhost',
-    apiPrefix: '/api/v1',
-    maxRequestSize: 10 * 1024 * 1024 // 10MB
+    host: 'localhost'
   };
 
   // 2. 创建平台
-  const microPlatformFactory = createPlatformFactory(null, {
-    config: { name: 'microservice-platform', version: '1.0.0' },
+  const platformFactory = createPlatformFactory(null, {
+    config: { name: 'extended-platform', version: '1.0.0' },
     providers: []
   });
   
-  const platform = microPlatformFactory();
+  const platform = platformFactory();
 
-  // 3. 引导微服务应用
+  // 3. 引导应用
   const app = await platform.bootstrapApplication([
-    ...provideApplicationConfig(microConfig),
+    ...provideApplicationConfig(appConfig),
     { provide: 'DATABASE_SERVICE', useClass: DatabaseService },
     { provide: 'AUTH_SERVICE', useClass: AuthService }
   ]);
 
-  // 4. 微服务启动类
-  class MicroserviceBootstrap {
+  // 4. 服务启动类
+  class ExtendedBootstrap {
     constructor(
-      @inject(APPLICATION_CONFIG) private config: MicroserviceApplicationConfig,
-      @inject(MICROSERVICE_APPLICATION_CONFIG) private microConfig: MicroserviceApplicationConfig,
+      @inject(APPLICATION_CONFIG) private config: ApplicationConfig & { port?: number; host?: string },
       @inject('DATABASE_SERVICE') private db: DatabaseService
     ) {}
 
     async start() {
-      console.log(`启动微服务: ${this.config.name} v${this.config.version}`);
-      console.log(`监听端口: ${this.microConfig.host}:${this.microConfig.port}`);
-      console.log(`API前缀: ${this.microConfig.apiPrefix}`);
+      console.log(`启动应用: ${this.config.name} v${this.config.version}`);
+      if (this.config.port && this.config.host) {
+        console.log(`监听地址: ${this.config.host}:${this.config.port}`);
+      }
       console.log(`调试模式: ${this.config.enableDebug ? '开启' : '关闭'}`);
       
       await this.db.connect();
@@ -133,7 +123,7 @@ export async function microserviceApplicationExample() {
     }
   }
 
-  const bootstrap = app.bootstrap(MicroserviceBootstrap);
+  const bootstrap = app.bootstrap(ExtendedBootstrap);
   await bootstrap.start();
 
   app.destroy();
@@ -150,17 +140,12 @@ export async function dynamicConfigExample() {
   // 1. 创建配置工厂（可根据环境变量动态生成）
   const configFactory = () => {
     const isProduction = process.env.NODE_ENV === 'production';
-    const port = parseInt(process.env.PORT || '3000');
     
     return {
-      type: 'microservice' as const,
       name: 'dynamic-service',
       environment: isProduction ? 'production' as const : 'development' as const,
       enableDebug: !isProduction,
-      port,
-      host: isProduction ? '0.0.0.0' : 'localhost',
-      apiPrefix: '/api',
-      maxRequestSize: isProduction ? 5 * 1024 * 1024 : 1024 * 1024
+      version: '1.0.0'
     };
   };
 
@@ -187,7 +172,7 @@ export async function dynamicConfigExample() {
     start() {
       console.log(`动态配置服务启动:`);
       console.log(`- 环境: ${this.config.environment}`);
-      console.log(`- 端口: ${this.config.port}`);
+      console.log(`- 版本: ${this.config.version}`);
       console.log(`- 调试: ${this.config.enableDebug}`);
       console.log(`- 启动时间: ${new Date(this.context.bootstrapTime)}`);
     }
@@ -287,8 +272,8 @@ class DynamicService {
 
 export async function runAllExamples() {
   try {
-    await webApplicationExample();
-    await microserviceApplicationExample();
+    await basicApplicationExample();
+    await extendedApplicationExample();
     await dynamicConfigExample();
     await legacyCompatibilityExample();
     

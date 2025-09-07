@@ -353,22 +353,14 @@ export {
   hasPlatform
 } from './platform-factory';
 
-// 应用配置系统
+// 应用配置系统（保持平台无关性）
 export {
   ApplicationConfig,
   BaseApplicationConfig,
-  WebApplicationConfig,
-  MicroserviceApplicationConfig,
-  DesktopApplicationConfig,
-  MobileApplicationConfig,
   ApplicationBootstrapContext,
   ApplicationConfigFactory,
   APPLICATION_CONFIG,
   APPLICATION_BOOTSTRAP_CONTEXT,
-  WEB_APPLICATION_CONFIG,
-  MICROSERVICE_APPLICATION_CONFIG,
-  DESKTOP_APPLICATION_CONFIG,
-  MOBILE_APPLICATION_CONFIG,
   provideApplicationConfig,
   provideApplicationConfigFactory
 } from './application-config';
@@ -399,21 +391,7 @@ export {
   getExtension,
   getAvailableExtensions,
   createExtensionManager,
-  BuiltInExtensions,
-  // 内置扩展服务
-  Logger,
-  HttpClient,
-  StorageService,
-  Router,
-  // 扩展配置令牌
-  LOGGER_CONFIG,
-  HTTP_CONFIG,
-  STORAGE_CONFIG,
-  ROUTER_CONFIG,
-  // 配置接口
-  LoggerConfig,
-  HttpConfig,
-  StorageConfig,
-  RouterConfig,
+  ExampleExtensions,
+  ExampleExtension,
   ExtensionConfig
 } from './platform-extensions';

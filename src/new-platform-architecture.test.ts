@@ -6,7 +6,7 @@ import {
   ApplicationFeature,
   ApplicationState,
   provideApplicationConfig,
-  WebApplicationConfig
+  ApplicationConfig
 } from './index';
 
 describe('新平台架构', () => {
@@ -81,20 +81,18 @@ describe('新平台架构', () => {
       // 创建第一个应用
       const app1 = await platform.bootstrapApplication('app1', [
         ...provideApplicationConfig({
-          type: 'web',
           name: 'web-app-1',
-          selector: '#app1'
-        } as WebApplicationConfig),
+          version: '1.0.0'
+        } as ApplicationConfig),
         { provide: 'APP1_SERVICE', useValue: 'service1' }
       ]);
 
       // 创建第二个应用
       const app2 = await platform.bootstrapApplication('app2', [
         ...provideApplicationConfig({
-          type: 'web', 
           name: 'web-app-2',
-          selector: '#app2'
-        } as WebApplicationConfig),
+          version: '1.0.0'
+        } as ApplicationConfig),
         { provide: 'APP2_SERVICE', useValue: 'service2' }
       ]);
 
