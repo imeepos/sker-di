@@ -383,7 +383,19 @@ export class DIDebugger {
       performanceWarnings: this.getPerformanceWarnings()
     };
 
-    return JSON.stringify(data, null, 2);
+    // 处理循环引用的replacer
+    const seen = new WeakSet();
+    const replacer = (key: string, value: any) => {
+      if (typeof value === "object" && value !== null) {
+        if (seen.has(value)) {
+          return "[Circular]";
+        }
+        seen.add(value);
+      }
+      return value;
+    };
+    
+    return JSON.stringify(data, replacer, 2);
   }
 
   /**

@@ -4,6 +4,7 @@ import { Injectable } from './injectable';
 import { InjectionToken } from './injection-token';
 import { Inject } from './inject';
 import { forwardRef } from './forward-ref';
+import { Injector } from './injector';
 
 describe('调试支持测试', () => {
   beforeEach(() => {
@@ -197,7 +198,7 @@ describe('🟢 绿阶段：注入器调试集成测试', () => {
   it('应该记录提供者注册事件', () => {
     const diDebugger = DIDebugger.getInstance();
     // 🟢 最小实现：注册提供者时记录事件
-    diDebugger.enableDevMode({ logToConsole: false });
+    diDebugger.enableDevMode({ logToConsole: false, maxEventHistory: 100 });
 
     const testToken = new InjectionToken<string>('TEST_TOKEN');
     const injector = new EnvironmentInjector([
@@ -206,13 +207,18 @@ describe('🟢 绿阶段：注入器调试集成测试', () => {
     ]);
 
     const debugInfo = diDebugger.getDebugInfo();
+    // 过滤此次注入器创建的provider注册事件
+    const thisInjectorId = injector.getInjectorId();
     const providerEvents = debugInfo.recentEvents.filter(
-      e => e.type === DebugEventType.ProviderRegistered
+      e => e.type === DebugEventType.ProviderRegistered && e.injectorId === thisInjectorId
     );
 
-    expect(providerEvents).toHaveLength(2);
-    expect(providerEvents[0].token).toBe(testToken);
-    expect(providerEvents[1].token).toBe(TestService);
+    expect(providerEvents).toHaveLength(3); // testToken, TestService, Injector
+    // 过滤掉自动注册的Injector provider，只检查用户提供的providers
+    const userProviderEvents = providerEvents.filter(e => e.token !== Injector);
+    expect(userProviderEvents).toHaveLength(2);
+    expect(userProviderEvents.some(e => e.token === testToken)).toBe(true);
+    expect(userProviderEvents.some(e => e.token === TestService)).toBe(true);
   });
 
   it('应该记录依赖请求和解析事件', () => {
@@ -242,7 +248,7 @@ describe('🟢 绿阶段：注入器调试集成测试', () => {
   it('应该记录实例创建事件', () => {
     // 🟢 最小实现：实例创建时记录事件
     const diDebugger = DIDebugger.getInstance();
-    diDebugger.enableDevMode({ logToConsole: false });
+    diDebugger.enableDevMode({ logToConsole: false, maxEventHistory: 100 });
 
     const injector = new EnvironmentInjector([
       { provide: TestService, useClass: TestService }
@@ -251,8 +257,10 @@ describe('🟢 绿阶段：注入器调试集成测试', () => {
     injector.get(TestService);
 
     const debugInfo = diDebugger.getDebugInfo();
+    // 过滤此次注入器创建的实例创建事件
+    const thisInjectorId = injector.getInjectorId();
     const createEvents = debugInfo.recentEvents.filter(
-      (e: any) => e.type === DebugEventType.InstanceCreated
+      (e: any) => e.type === DebugEventType.InstanceCreated && e.injectorId === thisInjectorId
     );
 
     expect(createEvents).toHaveLength(1);

@@ -68,7 +68,7 @@ describe('调试检查器测试', () => {
       expect(hierarchy).toContain('依赖注入器层次结构');
       expect(hierarchy).toContain('EnvironmentInjector');
       expect(hierarchy).toContain('[活跃]');
-      expect(hierarchy).toContain('提供者: 1');
+      expect(hierarchy).toContain('提供者: 2');
     });
 
     it('应该显示父子注入器关系', () => {

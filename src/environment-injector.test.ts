@@ -674,10 +674,10 @@ describe('EnvironmentInjector', () => {
         const snapshot = injector.getDebugSnapshot();
         expect(snapshot.id).toBe(injector.getInjectorId());
         expect(snapshot.type).toBe('EnvironmentInjector');
-        expect(snapshot.providersCount).toBe(1);
+        expect(snapshot.providersCount).toBe(2);
         expect(snapshot.instancesCount).toBe(0);
         expect(snapshot.isDestroyed).toBe(false);
-        expect(snapshot.providers).toHaveLength(1);
+        expect(snapshot.providers).toHaveLength(2);
         expect(snapshot.instances).toHaveLength(0);
       });
 
@@ -1036,7 +1036,7 @@ describe('EnvironmentInjector', () => {
       const injector = new EnvironmentInjector(providers);
       const snapshot = injector.getDebugSnapshot();
       
-      expect(snapshot.providers).toHaveLength(4);
+      expect(snapshot.providers).toHaveLength(5);
       expect(snapshot.providers.some(p => p.providerType === 'ValueProvider')).toBe(true);
       expect(snapshot.providers.some(p => p.providerType === 'ClassProvider')).toBe(true);
       expect(snapshot.providers.some(p => p.providerType === 'FactoryProvider')).toBe(true);
