@@ -1,4 +1,6 @@
 import { InjectionTokenType } from './injector';
+import { Injectable } from './injectable';
+import { InjectionToken } from './injection-token';
 
 /**
  * 调试级别
@@ -110,17 +112,39 @@ export interface DebugMetrics {
 }
 
 /**
+ * DI调试器接口
+ */
+export interface IDIDebugger {
+  enableDevMode(config?: Partial<DebugConfig>): void;
+  disable(): void;
+  updateConfig(config: Partial<DebugConfig>): void;
+  logEvent(event: Omit<DebugEvent, 'timestamp'>): void;
+  getEventHistory(): DebugEvent[];
+  getMetrics(): DebugMetrics;
+  getInjectorInfo(injectorId: string): InjectorDebugInfo | undefined;
+  getAllInjectorsInfo(): InjectorDebugInfo[];
+  clearHistory(): void;
+  printHierarchy(injector: any): void;
+  logProviders(injector: any): void;
+}
+
+/**
+ * DI调试器注入令牌
+ */
+export const DI_DEBUGGER = new InjectionToken<IDIDebugger>('DI_DEBUGGER');
+
+/**
  * 依赖注入调试器
  */
-export class DIDebugger {
-  private static instance: DIDebugger | null = null;
+@Injectable({ providedIn: 'root' })
+export class DIDebugger implements IDIDebugger {
   private config: DebugConfig;
   private eventHistory: DebugEvent[] = [];
   private metrics: DebugMetrics;
   private injectorInfos = new Map<string, InjectorDebugInfo>();
   private resolutionStartTimes = new Map<string, number>();
 
-  private constructor() {
+  constructor() {
     this.config = {
       enabled: false,
       level: DebugLevel.Error,
@@ -142,15 +166,6 @@ export class DIDebugger {
     };
   }
 
-  /**
-   * 获取调试器单例实例
-   */
-  static getInstance(): DIDebugger {
-    if (!DIDebugger.instance) {
-      DIDebugger.instance = new DIDebugger();
-    }
-    return DIDebugger.instance;
-  }
 
   /**
    * 启用开发模式调试
@@ -304,6 +319,54 @@ export class DIDebugger {
    */
   getInjectorInfo(injectorId: string): InjectorDebugInfo | undefined {
     return this.injectorInfos.get(injectorId);
+  }
+
+  /**
+   * 获取事件历史
+   */
+  getEventHistory(): DebugEvent[] {
+    return [...this.eventHistory];
+  }
+
+  /**
+   * 获取调试度量数据
+   */
+  getMetrics(): DebugMetrics {
+    return { ...this.metrics };
+  }
+
+  /**
+   * 获取所有注入器信息
+   */
+  getAllInjectorsInfo(): InjectorDebugInfo[] {
+    return Array.from(this.injectorInfos.values());
+  }
+
+  /**
+   * 打印注入器层次结构
+   */
+  printHierarchy(injector?: any): void {
+    console.log('=== 注入器层次结构 ===');
+    const injectors = this.getAllInjectorsInfo();
+    for (const inj of injectors) {
+      const indent = '  '.repeat(inj.parentId ? 1 : 0);
+      console.log(`${indent}📦 ${inj.type} (${inj.id})`);
+      console.log(`${indent}   提供者: ${inj.providersCount}, 实例: ${inj.instancesCount}`);
+    }
+  }
+
+  /**
+   * 打印提供者信息
+   */
+  logProviders(injector?: any): void {
+    console.log('=== 提供者信息 ===');
+    const injectors = this.getAllInjectorsInfo();
+    for (const inj of injectors) {
+      console.log(`\n注入器 ${inj.id}:`);
+      for (const provider of inj.providers) {
+        console.log(`  - ${provider.token} (${provider.providerType})`);
+      }
+    }
   }
 
   /**
@@ -534,11 +597,18 @@ export class DIDebugger {
   }
 }
 
+// 全局调试器实例（用于向后兼容）
+let globalDebuggerInstance: DIDebugger | null = null;
+
 /**
- * 获取调试器实例
+ * 获取调试器实例（向后兼容函数）
+ * @deprecated 推荐使用DI注入方式获取调试器
  */
 export function getDebugger(): DIDebugger {
-  return DIDebugger.getInstance();
+  if (!globalDebuggerInstance) {
+    globalDebuggerInstance = new DIDebugger();
+  }
+  return globalDebuggerInstance;
 }
 
 /**

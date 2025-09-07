@@ -16,7 +16,7 @@ describe('Debug 覆盖率测试', () => {
   let diDebuggerInstance: DIDebugger;
 
   beforeEach(() => {
-    diDebuggerInstance = DIDebugger.getInstance();
+    diDebuggerInstance = getDebugger();
     // 重置调试器状态
     diDebuggerInstance.disable();
   });
@@ -27,14 +27,14 @@ describe('Debug 覆盖率测试', () => {
 
   describe('DIDebugger 单例模式', () => {
     it('应该返回同一个实例', () => {
-      const instance1 = DIDebugger.getInstance();
-      const instance2 = DIDebugger.getInstance();
+      const instance1 = getDebugger();
+      const instance2 = getDebugger();
       expect(instance1).toBe(instance2);
     });
 
     it('应该通过getDebugger函数获取实例', () => {
       const instance = getDebugger();
-      expect(instance).toBe(DIDebugger.getInstance());
+      expect(instance).toBeInstanceOf(DIDebugger);
     });
   });
 

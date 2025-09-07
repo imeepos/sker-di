@@ -30,7 +30,7 @@ describe('调试支持测试', () => {
   describe('🔴 红阶段：调试器基本功能测试', () => {
     it('调试器应该正确启用开发模式', () => {
       // 🔴 失败的测试：启用开发模式
-      const diDebugger = DIDebugger.getInstance();
+      const diDebugger = getDebugger();
       diDebugger.enableDevMode({
         level: DebugLevel.Info,
         logToConsole: false,
@@ -44,7 +44,7 @@ describe('调试支持测试', () => {
     });
 
     it('应该测试不同调试级别的日志输出', () => {
-      const diDebugger = DIDebugger.getInstance();
+      const diDebugger = getDebugger();
       const consoleSpy = {
         info: jest.spyOn(console, 'info').mockImplementation(),
         debug: jest.spyOn(console, 'debug').mockImplementation(),
@@ -84,7 +84,7 @@ describe('调试支持测试', () => {
     });
 
     it('应该测试formatEvent的默认分支', () => {
-      const diDebugger = DIDebugger.getInstance();
+      const diDebugger = getDebugger();
       const consoleSpy = jest.spyOn(console, 'error').mockImplementation();
 
       diDebugger.enableDevMode({ level: DebugLevel.Error });
@@ -110,7 +110,7 @@ describe('调试支持测试', () => {
 
   it('应该记录调试事件', () => {
     // 🔴 失败的测试：记录调试事件
-    const diDebugger = DIDebugger.getInstance();
+    const diDebugger = getDebugger();
     diDebugger.enableDevMode({ logToConsole: false });
 
     diDebugger.logEvent({
@@ -127,7 +127,7 @@ describe('调试支持测试', () => {
 
   it('应该限制事件历史记录大小', () => {
     // 🔴 失败的测试：限制历史记录大小
-    const diDebugger = DIDebugger.getInstance();
+    const diDebugger = getDebugger();
     diDebugger.enableDevMode({
       logToConsole: false,
       maxEventHistory: 3
@@ -178,7 +178,7 @@ describe('🟢 绿阶段：注入器调试集成测试', () => {
   }
 
   it('应该记录注入器创建事件', () => {
-    const diDebugger = DIDebugger.getInstance();
+    const diDebugger = getDebugger();
     // 🟢 最小实现：创建注入器时记录事件
     diDebugger.enableDevMode({ logToConsole: false });
 
@@ -196,7 +196,7 @@ describe('🟢 绿阶段：注入器调试集成测试', () => {
   });
 
   it('应该记录提供者注册事件', () => {
-    const diDebugger = DIDebugger.getInstance();
+    const diDebugger = getDebugger();
     // 🟢 最小实现：注册提供者时记录事件
     diDebugger.enableDevMode({ logToConsole: false, maxEventHistory: 100 });
 
@@ -223,7 +223,7 @@ describe('🟢 绿阶段：注入器调试集成测试', () => {
 
   it('应该记录依赖请求和解析事件', () => {
     // 🟢 最小实现：依赖注入过程记录事件
-    const diDebugger = DIDebugger.getInstance();
+    const diDebugger = getDebugger();
     diDebugger.enableDevMode({ logToConsole: false });
 
     const injector = new EnvironmentInjector([
@@ -247,7 +247,7 @@ describe('🟢 绿阶段：注入器调试集成测试', () => {
 
   it('应该记录实例创建事件', () => {
     // 🟢 最小实现：实例创建时记录事件
-    const diDebugger = DIDebugger.getInstance();
+    const diDebugger = getDebugger();
     diDebugger.enableDevMode({ logToConsole: false, maxEventHistory: 100 });
 
     const injector = new EnvironmentInjector([
@@ -269,7 +269,7 @@ describe('🟢 绿阶段：注入器调试集成测试', () => {
 
   it('应该记录缓存命中事件', () => {
     // 🟢 最小实现：缓存命中时记录事件
-    const diDebugger = DIDebugger.getInstance();
+    const diDebugger = getDebugger();
     diDebugger.enableDevMode({ logToConsole: false });
 
     const injector = new EnvironmentInjector([
@@ -301,7 +301,7 @@ describe('🟢 绿阶段：注入器调试集成测试', () => {
       constructor(@Inject(forwardRef(() => ServiceA)) private serviceA: any) { }
     }
 
-    const diDebugger = DIDebugger.getInstance();
+    const diDebugger = getDebugger();
     diDebugger.enableDevMode({ logToConsole: false });
 
     const injector = new EnvironmentInjector([
@@ -321,7 +321,7 @@ describe('🟢 绿阶段：注入器调试集成测试', () => {
 
   it('应该记录注入器销毁事件', () => {
     // 🟢 最小实现：注入器销毁时记录事件
-    const diDebugger = DIDebugger.getInstance();
+    const diDebugger = getDebugger();
     diDebugger.enableDevMode({ logToConsole: false });
 
     const injector = new EnvironmentInjector([
@@ -350,7 +350,7 @@ describe('🔄 重构阶段：度量数据收集测试', () => {
   }
 
   it('应该正确收集度量数据', () => {
-    const diDebugger = DIDebugger.getInstance();
+    const diDebugger = getDebugger();
     diDebugger.enableDevMode({
       logToConsole: false,
       collectMetrics: true
@@ -374,7 +374,7 @@ describe('🔄 重构阶段：度量数据收集测试', () => {
   });
 
   it('应该计算缓存命中率', () => {
-    const diDebugger = DIDebugger.getInstance();
+    const diDebugger = getDebugger();
     diDebugger.enableDevMode({
       logToConsole: false,
       collectMetrics: true
@@ -394,7 +394,7 @@ describe('🔄 重构阶段：度量数据收集测试', () => {
   });
 
   it('应该跟踪解析时间', () => {
-    const diDebugger = DIDebugger.getInstance();
+    const diDebugger = getDebugger();
     diDebugger.enableDevMode({
       logToConsole: false,
       collectMetrics: true
@@ -421,7 +421,7 @@ describe('调试信息查询测试', () => {
   }
 
   it('应该提供注入器调试信息', () => {
-    const diDebugger = DIDebugger.getInstance();
+    const diDebugger = getDebugger();
     diDebugger.enableDevMode({ logToConsole: false });
 
     const injector = new EnvironmentInjector([
@@ -449,7 +449,7 @@ describe('调试信息查询测试', () => {
       constructor(private child: ChildService) { }
     }
 
-    const diDebugger = DIDebugger.getInstance();
+    const diDebugger = getDebugger();
     diDebugger.enableDevMode({ logToConsole: false });
 
     const injector = new EnvironmentInjector([
@@ -465,7 +465,7 @@ describe('调试信息查询测试', () => {
   });
 
   it('应该提供性能警告', () => {
-    const diDebugger = DIDebugger.getInstance();
+    const diDebugger = getDebugger();
     diDebugger.enableDevMode({
       logToConsole: false,
       collectMetrics: true
@@ -490,7 +490,7 @@ describe('调试信息查询测试', () => {
 
 describe('调试配置测试', () => {
   it('应该支持更新调试配置', () => {
-    const diDebugger = DIDebugger.getInstance();
+    const diDebugger = getDebugger();
     diDebugger.enableDevMode({ level: DebugLevel.Error });
 
     diDebugger.updateConfig({
@@ -504,7 +504,7 @@ describe('调试配置测试', () => {
   });
 
   it('应该支持禁用调试', () => {
-    const diDebugger = DIDebugger.getInstance();
+    const diDebugger = getDebugger();
     diDebugger.enableDevMode({ logToConsole: false });
 
     expect(diDebugger.getDebugInfo().config.enabled).toBe(true);
@@ -516,7 +516,7 @@ describe('调试配置测试', () => {
   });
 
   it('应该支持清空调试历史', () => {
-    const diDebugger = DIDebugger.getInstance();
+    const diDebugger = getDebugger();
     diDebugger.enableDevMode({ logToConsole: false });
 
     diDebugger.logEvent({
@@ -533,7 +533,7 @@ describe('调试配置测试', () => {
   });
 
   it('应该支持导出调试数据', () => {
-    const diDebugger = DIDebugger.getInstance();
+    const diDebugger = getDebugger();
     diDebugger.enableDevMode({ logToConsole: false });
 
     const injector = new EnvironmentInjector([
@@ -558,7 +558,7 @@ describe('便捷函数测试', () => {
   it('enableDevMode 便捷函数应该正常工作', () => {
     enableDevMode({ level: DebugLevel.Trace });
 
-    const diDebugger = DIDebugger.getInstance();
+    const diDebugger = getDebugger();
     const config = diDebugger.getDebugInfo().config;
     expect(config.enabled).toBe(true);
     expect(config.level).toBe(DebugLevel.Trace);
@@ -567,7 +567,7 @@ describe('便捷函数测试', () => {
   it('disableDebug 便捷函数应该正常工作', () => {
     // 🔴 失败的测试：测试disableDebug便捷函数
     const { disableDebug } = require('./debug');
-    const diDebugger = DIDebugger.getInstance();
+    const diDebugger = getDebugger();
 
     diDebugger.enableDevMode({ logToConsole: false });
     expect(diDebugger.getDebugInfo().config.enabled).toBe(true);
@@ -587,7 +587,7 @@ describe('🔴 红阶段：未覆盖方法测试', () => {
       }
     }
 
-    const diDebugger = DIDebugger.getInstance();
+    const diDebugger = getDebugger();
     diDebugger.enableDevMode({ logToConsole: false });
 
     const injector = new EnvironmentInjector([
@@ -605,7 +605,7 @@ describe('🔴 红阶段：未覆盖方法测试', () => {
 
   it('应该返回undefined当注入器不存在时', () => {
     // 🔴 失败的测试：getInjectorInfo不存在的注入器
-    const diDebugger = DIDebugger.getInstance();
+    const diDebugger = getDebugger();
     diDebugger.enableDevMode({ logToConsole: false });
 
     const nonExistentInfo = diDebugger.getInjectorInfo('non-existent-id');
@@ -621,7 +621,7 @@ describe('🔴 红阶段：未覆盖方法测试', () => {
       }
     }
 
-    const diDebugger = DIDebugger.getInstance();
+    const diDebugger = getDebugger();
     diDebugger.enableDevMode({
       logToConsole: false,
       collectMetrics: true
@@ -649,7 +649,7 @@ describe('🔴 红阶段：未覆盖方法测试', () => {
       }
     }
 
-    const diDebugger = DIDebugger.getInstance();
+    const diDebugger = getDebugger();
     diDebugger.enableDevMode({
       logToConsole: false,
       collectMetrics: true
@@ -671,7 +671,7 @@ describe('🔴 红阶段：未覆盖方法测试', () => {
 
   it('应该正确格式化不同类型的令牌名称', () => {
     // 🔴 失败的测试：getTokenName私有方法
-    const diDebugger = DIDebugger.getInstance();
+    const diDebugger = getDebugger();
     const getTokenName = diDebugger['getTokenName'].bind(diDebugger);
 
     // 测试字符串令牌
@@ -700,7 +700,7 @@ describe('🔴 红阶段：未覆盖方法测试', () => {
 
   it('应该正确获取事件级别', () => {
     // 🔴 失败的测试：getEventLevel私有方法
-    const diDebugger = DIDebugger.getInstance();
+    const diDebugger = getDebugger();
     const getEventLevel = diDebugger['getEventLevel'].bind(diDebugger);
 
     expect(getEventLevel(DebugEventType.CircularDependencyDetected)).toBe(DebugLevel.Error);
@@ -711,7 +711,7 @@ describe('🔴 红阶段：未覆盖方法测试', () => {
 
   it('应该正确格式化不同类型的事件', () => {
     // 🔴 失败的测试：formatEvent私有方法
-    const diDebugger = DIDebugger.getInstance();
+    const diDebugger = getDebugger();
     const formatEvent = diDebugger['formatEvent'].bind(diDebugger);
 
     const dependencyRequestedEvent: DebugEvent = {
@@ -740,7 +740,7 @@ describe('🔴 红阶段：未覆盖方法测试', () => {
 
   it('应该在禁用度量收集时跳过度量更新', () => {
     // 🔴 失败的测试：度量收集禁用时的行为
-    const diDebugger = DIDebugger.getInstance();
+    const diDebugger = getDebugger();
     diDebugger.enableDevMode({
       logToConsole: false,
       collectMetrics: false
@@ -760,7 +760,7 @@ describe('🔴 红阶段：未覆盖方法测试', () => {
 
   it('应该在不同调试级别下正确输出到控制台', () => {
     // 🔴 失败的测试：控制台输出级别控制
-    const diDebugger = DIDebugger.getInstance();
+    const diDebugger = getDebugger();
     
     // 确保状态清理
     diDebugger.disable();
@@ -825,7 +825,7 @@ describe('🔴 红阶段：未覆盖方法测试', () => {
 
   it('应该正确获取依赖关系图', () => {
     // 🔴 失败的测试：getDependencyGraph方法
-    const diDebugger = DIDebugger.getInstance();
+    const diDebugger = getDebugger();
     diDebugger.enableDevMode({ logToConsole: false });
 
     // 模拟依赖解析事件
@@ -850,7 +850,7 @@ describe('🔴 红阶段：未覆盖方法测试', () => {
 
   it('应该正确检测性能警告', () => {
     // 🔴 失败的测试：getPerformanceWarnings方法
-    const diDebugger = DIDebugger.getInstance();
+    const diDebugger = getDebugger();
     diDebugger.enableDevMode({
       logToConsole: false,
       collectMetrics: true
@@ -874,7 +874,7 @@ describe('🔴 红阶段：未覆盖方法测试', () => {
 
   it('应该正确更新解析时间统计', () => {
     // 🔴 失败的测试：updateResolutionTime私有方法
-    const diDebugger = DIDebugger.getInstance();
+    const diDebugger = getDebugger();
     diDebugger.enableDevMode({
       logToConsole: false,
       collectMetrics: true
@@ -896,7 +896,7 @@ describe('🔴 红阶段：未覆盖方法测试', () => {
 
   it('应该正确处理不同事件类型的度量更新', () => {
     // 🔴 失败的测试：updateMetrics方法的所有分支
-    const diDebugger = DIDebugger.getInstance();
+    const diDebugger = getDebugger();
     diDebugger.enableDevMode({
       logToConsole: false,
       collectMetrics: true
@@ -937,7 +937,7 @@ describe('🔴 红阶段：未覆盖方法测试', () => {
 
   it('应该正确处理缓存命中率计算', () => {
     // 🔴 失败的测试：缓存命中率计算逻辑
-    const diDebugger = DIDebugger.getInstance();
+    const diDebugger = getDebugger();
     diDebugger.enableDevMode({
       logToConsole: false,
       collectMetrics: true
@@ -970,7 +970,7 @@ describe('🔴 红阶段：未覆盖方法测试', () => {
 
   it('应该正确处理startResolution和endResolution', () => {
     // 🔴 失败的测试：解析计时功能
-    const diDebugger = DIDebugger.getInstance();
+    const diDebugger = getDebugger();
     diDebugger.enableDevMode({
       logToConsole: false,
       collectMetrics: true
@@ -999,7 +999,7 @@ describe('🔴 红阶段：未覆盖方法测试', () => {
 
   it('应该在禁用度量收集时跳过计时操作', () => {
     // 🔴 失败的测试：禁用度量时的行为
-    const diDebugger = DIDebugger.getInstance();
+    const diDebugger = getDebugger();
     // 确保状态清理
     diDebugger.disable();
     diDebugger.clearHistory();
@@ -1038,7 +1038,7 @@ describe('🔴 红阶段：未覆盖方法测试', () => {
       instances: []
     };
 
-    const diDebugger = DIDebugger.getInstance();
+    const diDebugger = getDebugger();
     // 确保状态清理
     diDebugger.disable();
     diDebugger.clearHistory();
@@ -1070,7 +1070,7 @@ describe('🔴 红阶段：未覆盖方法测试', () => {
       trace: jest.spyOn(console, 'trace').mockImplementation()
     };
 
-    const diDebugger = DIDebugger.getInstance();
+    const diDebugger = getDebugger();
     diDebugger.enableDevMode({
       logToConsole: true,
       level: DebugLevel.Trace
@@ -1111,7 +1111,7 @@ describe('🔴 红阶段：未覆盖方法测试', () => {
 
   it('应该测试getTokenName方法处理不同类型的token', () => {
     // 🔴 失败的测试：测试token名称获取
-    const diDebugger = DIDebugger.getInstance();
+    const diDebugger = getDebugger();
     // 确保状态清理
      diDebugger.disable();
      diDebugger.clearHistory();
@@ -1160,7 +1160,7 @@ describe('🔴 红阶段：未覆盖方法测试', () => {
 
   it('应该测试formatEvent方法的默认分支', () => {
     // 🔴 失败的测试：测试formatEvent的default情况
-    const diDebugger = DIDebugger.getInstance();
+    const diDebugger = getDebugger();
     // 确保状态清理
      diDebugger.disable();
      diDebugger.clearHistory();

@@ -1,31 +1,51 @@
-import { 
-  DIDebugger, 
-  getDebugger, 
-  DebugLevel, 
-  InjectorDebugInfo, 
-  ProviderDebugInfo, 
+import {
+  DIDebugger,
+  IDIDebugger,
+  getDebugger,
+  DebugLevel,
+  InjectorDebugInfo,
+  ProviderDebugInfo,
   InstanceDebugInfo,
   DebugMetrics
 } from './debug';
+import { Injectable } from './injectable';
+import { Inject } from './inject';
+import { InjectionToken } from './injection-token';
+
+/**
+ * DI检查器接口
+ */
+export interface IDIInspector {
+  printInjectorHierarchy(): string;
+  printInjectorDetails(injectorId?: string): string;
+  printProviders(injectorId?: string): string;
+  printInstances(injectorId?: string): string;
+  printMetrics(): string;
+  healthCheck(injector?: any): any;
+  generateReport(injector?: any): string;
+  searchTokens(pattern: string): string;
+}
+
+/**
+ * DI检查器注入令牌
+ */
+export const DI_INSPECTOR = new InjectionToken<IDIInspector>('DI_INSPECTOR');
 
 /**
  * 依赖注入调试检查器
  * 提供注入器状态检查和可视化工具
  */
-export class DIInspector {
-  private debugger: DIDebugger;
-
-  constructor() {
-    this.debugger = getDebugger();
-  }
+@Injectable({ providedIn: 'root' })
+export class DIInspector implements IDIInspector {
+  constructor(@Inject(DIDebugger) private diDebugger: DIDebugger) {}
 
   /**
    * 打印注入器层次结构
    */
   printInjectorHierarchy(): string {
-    const debugInfo = this.debugger.getDebugInfo();
+    const debugInfo = this.diDebugger.getDebugInfo();
     const injectors = debugInfo.injectors;
-    
+
     if (injectors.length === 0) {
       return '没有发现活跃的注入器';
     }
@@ -33,7 +53,7 @@ export class DIInspector {
     // 构建层次结构
     const rootInjectors = injectors.filter(inj => !inj.parentId);
     const childMap = new Map<string, InjectorDebugInfo[]>();
-    
+
     for (const inj of injectors) {
       if (inj.parentId) {
         if (!childMap.has(inj.parentId)) {
@@ -57,13 +77,13 @@ export class DIInspector {
    * 渲染注入器树
    */
   private renderInjectorTree(
-    injector: InjectorDebugInfo, 
-    childMap: Map<string, InjectorDebugInfo[]>, 
+    injector: InjectorDebugInfo,
+    childMap: Map<string, InjectorDebugInfo[]>,
     depth: number
   ): string {
     const indent = '  '.repeat(depth);
     const status = injector.isDestroyed ? '[已销毁]' : '[活跃]';
-    
+
     let output = `${indent}📦 ${injector.type} (${injector.id}) ${status}\n`;
     output += `${indent}   └─ 提供者: ${injector.providersCount}，实例: ${injector.instancesCount}\n`;
 
@@ -82,13 +102,13 @@ export class DIInspector {
    * 打印注入器详细信息
    */
   printInjectorDetails(injectorId?: string): string {
-    const debugInfo = this.debugger.getDebugInfo();
-    const injectors = injectorId 
+    const debugInfo = this.diDebugger.getDebugInfo();
+    const injectors = injectorId
       ? debugInfo.injectors.filter(inj => inj.id === injectorId)
       : debugInfo.injectors;
 
     if (injectors.length === 0) {
-      return injectorId 
+      return injectorId
         ? `未找到注入器: ${injectorId}`
         : '没有发现活跃的注入器';
     }
@@ -122,7 +142,7 @@ export class DIInspector {
         if (provider.isMulti) flags.push('multi');
         if (provider.isLazy) flags.push('lazy');
         const flagStr = flags.length > 0 ? ` [${flags.join(', ')}]` : '';
-        
+
         output += `   • ${provider.token} (${provider.providerType})${flagStr}\n`;
       }
       output += '\n';
@@ -136,7 +156,7 @@ export class DIInspector {
         if (instance.isLazy) flags.push('lazy');
         if (instance.hasOnDestroy) flags.push('OnDestroy');
         const flagStr = flags.length > 0 ? ` [${flags.join(', ')}]` : '';
-        
+
         output += `   • ${instance.tokenName} → ${instance.instanceType}${flagStr}\n`;
       }
       output += '\n';
@@ -149,7 +169,7 @@ export class DIInspector {
    * 打印性能统计
    */
   printPerformanceStats(): string {
-    const debugInfo = this.debugger.getDebugInfo();
+    const debugInfo = this.diDebugger.getDebugInfo();
     const metrics = debugInfo.metrics;
 
     let output = '📊 性能统计\n';
@@ -164,7 +184,7 @@ export class DIInspector {
     output += `自动解析提供者: ${metrics.autoResolvedProviders}\n\n`;
 
     // 性能警告
-    const warnings = this.debugger.getPerformanceWarnings();
+    const warnings = this.diDebugger.getPerformanceWarnings();
     if (warnings.length > 0) {
       output += '⚠️ 性能警告:\n';
       for (const warning of warnings) {
@@ -180,7 +200,7 @@ export class DIInspector {
    * 打印依赖关系图
    */
   printDependencyGraph(): string {
-    const graph = this.debugger.getDependencyGraph();
+    const graph = this.diDebugger.getDependencyGraph();
     const keys = Object.keys(graph);
 
     if (keys.length === 0) {
@@ -206,7 +226,7 @@ export class DIInspector {
    * 搜索令牌
    */
   searchTokens(searchTerm: string): string {
-    const debugInfo = this.debugger.getDebugInfo();
+    const debugInfo = this.diDebugger.getDebugInfo();
     const results: Array<{
       injectorId: string;
       type: 'provider' | 'instance';
@@ -228,7 +248,7 @@ export class DIInspector {
       // 搜索实例
       for (const instance of injector.instances) {
         if (instance.tokenName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-            instance.instanceType.toLowerCase().includes(searchTerm.toLowerCase())) {
+          instance.instanceType.toLowerCase().includes(searchTerm.toLowerCase())) {
           results.push({
             injectorId: injector.id,
             type: 'instance',
@@ -264,7 +284,7 @@ export class DIInspector {
    * 验证注入器健康状态
    */
   validateHealth(): string {
-    const debugInfo = this.debugger.getDebugInfo();
+    const debugInfo = this.diDebugger.getDebugInfo();
     const issues: string[] = [];
 
     // 检查销毁的注入器
@@ -274,11 +294,11 @@ export class DIInspector {
     }
 
     // 检查性能问题
-    const warnings = this.debugger.getPerformanceWarnings();
+    const warnings = this.diDebugger.getPerformanceWarnings();
     issues.push(...warnings);
 
     // 检查空注入器
-    const emptyInjectors = debugInfo.injectors.filter(inj => 
+    const emptyInjectors = debugInfo.injectors.filter(inj =>
       !inj.isDestroyed && inj.providersCount === 0 && inj.instancesCount === 0
     );
     if (emptyInjectors.length > 0) {
@@ -301,11 +321,39 @@ export class DIInspector {
   }
 
   /**
+   * 打印提供者信息
+   */
+  printProviders(injectorId?: string): string {
+    return this.printInjectorDetails(injectorId);
+  }
+
+  /**
+   * 打印实例信息
+   */
+  printInstances(injectorId?: string): string {
+    return this.printInjectorDetails(injectorId);
+  }
+
+  /**
+   * 打印性能指标
+   */
+  printMetrics(): string {
+    return this.printPerformanceStats();
+  }
+
+  /**
+   * 健康检查
+   */
+  healthCheck(injector?: any): any {
+    return this.validateHealth();
+  }
+
+  /**
    * 生成完整的调试报告
    */
-  generateReport(): string {
+  generateReport(injector?: any): string {
     let report = '';
-    
+
     report += '📋 依赖注入系统调试报告\n';
     report += '=' + '='.repeat(40) + '\n';
     report += `生成时间: ${new Date().toLocaleString()}\n\n`;
@@ -322,30 +370,30 @@ export class DIInspector {
    * 清空调试历史
    */
   clearHistory(): void {
-    this.debugger.clearHistory();
+    this.diDebugger.clearHistory();
   }
 
   /**
    * 导出调试数据
    */
   exportData(): string {
-    return this.debugger.exportDebugData();
+    return this.diDebugger.exportDebugData();
   }
 }
 
-/**
- * 全局调试检查器实例
- */
-let inspectorInstance: DIInspector | null = null;
+// 全局检查器实例（用于向后兼容）
+let globalInspectorInstance: DIInspector | null = null;
 
 /**
- * 获取调试检查器实例
+ * 获取调试检查器实例（向后兼容函数）
+ * @deprecated 推荐使用DI注入方式获取检查器
  */
 export function getInspector(): DIInspector {
-  if (!inspectorInstance) {
-    inspectorInstance = new DIInspector();
+  if (!globalInspectorInstance) {
+    const diDebugger = getDebugger();
+    globalInspectorInstance = new DIInspector(diDebugger);
   }
-  return inspectorInstance;
+  return globalInspectorInstance;
 }
 
 /**

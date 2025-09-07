@@ -2,7 +2,7 @@ import { PlatformRef, PlatformFactory, PlatformModule, PlatformConfig, PlatformE
 import { ApplicationRef } from './application-manager';
 import { EnvironmentInjector } from './environment-injector';
 import { Provider } from './provider';
-import { getDebugger, DebugEventType } from './debug';
+import { IDIDebugger, DI_DEBUGGER, DebugEventType, DIDebugger } from './debug';
 import { APPLICATION_CONFIG, APPLICATION_BOOTSTRAP_CONTEXT, BaseApplicationConfig, ApplicationBootstrapContext } from './application-config';
 import { ApplicationManager, ApplicationFeature } from './application-manager';
 
@@ -11,7 +11,7 @@ import { ApplicationManager, ApplicationFeature } from './application-manager';
  */
 class Platform extends PlatformRef {
   private _destroyed = false;
-  private readonly debugger = getDebugger();
+  private readonly debugger: IDIDebugger;
   private readonly extensions: PlatformExtension[] = [];
   private readonly applicationManager: ApplicationManager;
 
@@ -22,7 +22,9 @@ class Platform extends PlatformRef {
   ) {
     super();
     this.extensions = extensions;
-    this.applicationManager = new ApplicationManager(injector);
+    // 从注入器获取调试器
+    this.debugger = this.injector.get(DI_DEBUGGER);
+    this.applicationManager = this.injector.get(ApplicationManager);
     this.initializeExtensions();
   }
 
@@ -333,8 +335,13 @@ export function createPlatformFactory(
       return existingPlatform;
     }
 
-    // 合并提供者
-    let allProviders: Provider[] = [...module.providers];
+    // 合并提供者，包含核心调试服务
+    let allProviders: Provider[] = [
+      // 核心调试服务
+      { provide: DI_DEBUGGER, useClass: DIDebugger },
+      { provide: ApplicationManager, useClass: ApplicationManager },
+      ...module.providers
+    ];
     
     // 如果有父平台工厂，创建父平台并合并其提供者
     let parentInjector: EnvironmentInjector | undefined;

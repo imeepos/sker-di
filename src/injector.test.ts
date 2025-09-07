@@ -15,6 +15,14 @@ class TestInjector extends Injector {
     }
     throw new Error(`Token not found: ${token}`);
   }
+
+  destroy(): void {
+    
+  }
+
+  getInjectorId(): string {
+    return `test_injector`
+  }
 }
 
 describe('Injector', () => {

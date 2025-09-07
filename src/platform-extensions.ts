@@ -1,8 +1,4 @@
 import { PlatformExtension, PlatformRef } from './platform-ref';
-import { Provider } from './provider';
-import { Injectable } from './injectable';
-import { InjectionToken } from './injection-token';
-
 /**
  * 扩展配置接口
  */
@@ -109,180 +105,23 @@ class ExtensionRegistry {
 }
 
 // ============================================================================
-// 内置扩展定义
+// 扩展示例 (仅供参考，实际项目中应该删除)
 // ============================================================================
 
 /**
- * 日志扩展令牌
+ * 示例扩展 - 展示如何创建自定义扩展
+ * 注意：这只是一个示例，实际使用时应该创建你自己的扩展
  */
-export const LOGGER_CONFIG = new InjectionToken<LoggerConfig>('LOGGER_CONFIG');
-
-export interface LoggerConfig {
-  level: 'debug' | 'info' | 'warn' | 'error';
-  enableColors?: boolean;
-  enableTimestamp?: boolean;
-}
-
-@Injectable({ providedIn: 'platform' })
-export class Logger {
-  constructor() {}
-
-  debug(message: string, ...args: any[]): void {
-    console.debug(`[DEBUG] ${message}`, ...args);
-  }
-
-  info(message: string, ...args: any[]): void {
-    console.info(`[INFO] ${message}`, ...args);
-  }
-
-  warn(message: string, ...args: any[]): void {
-    console.warn(`[WARN] ${message}`, ...args);
-  }
-
-  error(message: string, ...args: any[]): void {
-    console.error(`[ERROR] ${message}`, ...args);
-  }
-}
-
-/**
- * 日志扩展
- */
-export const LoggerExtension: PlatformExtension = {
-  name: 'logger',
+export const ExampleExtension: PlatformExtension = {
+  name: 'example',
   providers: [
-    { provide: Logger, useClass: Logger },
-    { provide: LOGGER_CONFIG, useValue: { level: 'info', enableColors: true } }
+    // 在这里添加你的扩展提供者
   ],
   initialize: async (platform: PlatformRef) => {
-    const logger = platform.injector.get(Logger);
-    const config = platform.injector.get(LOGGER_CONFIG);
-    logger.info(`Logger extension initialized with level: ${config.level}`);
-  }
-};
-
-/**
- * HTTP客户端配置
- */
-export const HTTP_CONFIG = new InjectionToken<HttpConfig>('HTTP_CONFIG');
-
-export interface HttpConfig {
-  baseUrl?: string;
-  timeout?: number;
-  headers?: Record<string, string>;
-}
-
-@Injectable({ providedIn: 'platform' })
-export class HttpClient {
-  constructor() {}
-
-  async get(url: string, options?: any): Promise<any> {
-    // 简化的HTTP客户端实现
-    console.log(`HTTP GET: ${url}`, options);
-    return { data: 'mock response' };
-  }
-
-  async post(url: string, data?: any, options?: any): Promise<any> {
-    console.log(`HTTP POST: ${url}`, data, options);
-    return { data: 'mock response' };
-  }
-}
-
-/**
- * HTTP扩展
- */
-export const HttpExtension: PlatformExtension = {
-  name: 'http',
-  providers: [
-    { provide: HttpClient, useClass: HttpClient },
-    { provide: HTTP_CONFIG, useValue: { timeout: 5000 } }
-  ],
-  initialize: async (platform: PlatformRef) => {
-    const http = platform.injector.get(HttpClient);
-    const config = platform.injector.get(HTTP_CONFIG);
-    console.log('HTTP extension initialized with config:', config);
-  }
-};
-
-/**
- * 存储服务配置
- */
-export const STORAGE_CONFIG = new InjectionToken<StorageConfig>('STORAGE_CONFIG');
-
-export interface StorageConfig {
-  type: 'memory' | 'localStorage' | 'sessionStorage';
-  prefix?: string;
-}
-
-@Injectable({ providedIn: 'platform' })
-export class StorageService {
-  constructor() {}
-
-  get(key: string): string | null {
-    // 简化的存储实现
-    return `mock-value-${key}`;
-  }
-
-  set(key: string, value: string): void {
-    console.log(`Storage SET: ${key} = ${value}`);
-  }
-
-  remove(key: string): void {
-    console.log(`Storage REMOVE: ${key}`);
-  }
-}
-
-/**
- * 存储扩展
- */
-export const StorageExtension: PlatformExtension = {
-  name: 'storage',
-  providers: [
-    { provide: StorageService, useClass: StorageService },
-    { provide: STORAGE_CONFIG, useValue: { type: 'memory', prefix: 'app-' } }
-  ],
-  initialize: async (platform: PlatformRef) => {
-    const storage = platform.injector.get(StorageService);
-    const config = platform.injector.get(STORAGE_CONFIG);
-    console.log(`Storage extension initialized with type: ${config.type}`);
-  }
-};
-
-/**
- * 路由器配置
- */
-export const ROUTER_CONFIG = new InjectionToken<RouterConfig>('ROUTER_CONFIG');
-
-export interface RouterConfig {
-  enableTracing?: boolean;
-  useHash?: boolean;
-}
-
-@Injectable({ providedIn: 'platform' })
-export class Router {
-  constructor() {}
-
-  navigate(path: string): void {
-    console.log(`Router navigate to: ${path}`);
-  }
-
-  getCurrentPath(): string {
-    return '/current-path';
-  }
-}
-
-/**
- * 路由扩展
- */
-export const RouterExtension: PlatformExtension = {
-  name: 'router',
-  providers: [
-    { provide: Router, useClass: Router },
-    { provide: ROUTER_CONFIG, useValue: { enableTracing: false } }
-  ],
-  initialize: async (platform: PlatformRef) => {
-    const router = platform.injector.get(Router);
-    const config = platform.injector.get(ROUTER_CONFIG);
-    console.log('Router extension initialized with config:', config);
+    console.log('Example extension initialized');
+  },
+  destroy: async (platform: PlatformRef) => {
+    console.log('Example extension destroyed');
   }
 };
 
@@ -372,35 +211,16 @@ export class ExtensionManager {
 }
 
 // ============================================================================
-// 注册内置扩展
+// 示例：如何注册扩展 (仅供参考)
 // ============================================================================
 
-// 注册所有内置扩展
-ExtensionRegistry.register(LoggerExtension, {
-  name: 'logger',
-  version: '1.0.0',
-  description: '日志服务扩展'
-});
-
-ExtensionRegistry.register(HttpExtension, {
-  name: 'http',
-  version: '1.0.0',
-  description: 'HTTP客户端扩展',
-  dependencies: ['logger']
-});
-
-ExtensionRegistry.register(StorageExtension, {
-  name: 'storage',
-  version: '1.0.0',
-  description: '存储服务扩展'
-});
-
-ExtensionRegistry.register(RouterExtension, {
-  name: 'router',
-  version: '1.0.0',
-  description: '路由服务扩展',
-  dependencies: ['logger']
-});
+// 示例：注册自定义扩展
+// ExtensionRegistry.register(MyCustomExtension, {
+//   name: 'my-extension',
+//   version: '1.0.0',
+//   description: '我的自定义扩展',
+//   dependencies: ['other-extension']
+// });
 
 // ============================================================================
 // 导出API
@@ -435,11 +255,8 @@ export function createExtensionManager(): ExtensionManager {
 }
 
 /**
- * 内置扩展常量
+ * 示例扩展常量 (仅供参考)
  */
-export const BuiltInExtensions = {
-  Logger: LoggerExtension,
-  Http: HttpExtension,
-  Storage: StorageExtension,
-  Router: RouterExtension
+export const ExampleExtensions = {
+  Example: ExampleExtension
 } as const;

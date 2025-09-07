@@ -1,9 +1,9 @@
 import { EnvironmentInjector } from './environment-injector';
 import { Provider } from './provider';
 import { OnDestroy } from './lifecycle';
-import { InjectionTokenType } from './injector';
+import { InjectionTokenType, Injector } from './injector';
 import { ApplicationFeature } from './application-manager';
-import { getDebugger, DebugEventType } from './debug';
+import { IDIDebugger, DI_DEBUGGER, DebugEventType } from './debug';
 
 /**
  * Feature状态枚举
@@ -59,12 +59,14 @@ export interface FeatureRef extends OnDestroy {
 export class DefaultFeatureRef implements FeatureRef {
   private _state: FeatureState = FeatureState.INITIALIZING;
   private _destroyed = false;
-  private readonly debugger = getDebugger();
+  private readonly debugger: IDIDebugger;
 
   constructor(
     public readonly feature: ApplicationFeature,
     public readonly injector: EnvironmentInjector
   ) {
+    // 从注入器获取调试器
+    this.debugger = this.injector.get(DI_DEBUGGER);
     this._state = FeatureState.ACTIVE;
   }
 
@@ -167,7 +169,7 @@ export class DefaultFeatureRef implements FeatureRef {
  */
 export function createFeatureRef(
   feature: ApplicationFeature,
-  applicationInjector: EnvironmentInjector
+  applicationInjector: Injector
 ): FeatureRef {
   // 为Feature创建独立的注入器，以实现作用域隔离
   const featureProviders = feature.providers || [];

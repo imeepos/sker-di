@@ -58,6 +58,8 @@ export { forwardRef, ForwardRef, isForwardRef, resolveForwardRef } from './forwa
 // 调试和开发工具
 export {
   DIDebugger,
+  IDIDebugger,
+  DI_DEBUGGER,
   getDebugger,
   enableDevMode,
   disableDebug,
@@ -73,6 +75,8 @@ export {
 
 export {
   DIInspector,
+  IDIInspector,
+  DI_INSPECTOR,
   getInspector,
   printHierarchy,
   printStats,

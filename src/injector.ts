@@ -43,4 +43,8 @@ export abstract class Injector {
    * @returns 依赖实例
    */
   abstract get<T>(token: InjectionTokenType<T>): T;
+
+  abstract destroy(): void;
+
+  abstract getInjectorId(): string;
 }

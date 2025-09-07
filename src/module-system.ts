@@ -1,7 +1,7 @@
 import { Provider } from './provider';
 import { InjectionToken } from './injection-token';
-import { Injectable, InjectableOptions } from './injectable';
 import { PlatformExtension } from './platform-ref';
+import { Injectable } from './injectable';
 
 /**
  * 模块元数据接口
@@ -9,16 +9,16 @@ import { PlatformExtension } from './platform-ref';
 export interface ModuleMetadata {
   /** 模块提供的服务 */
   providers?: Provider[];
-  
+
   /** 导入的其他模块 */
   imports?: (ModuleClass | ModuleWithProviders)[];
-  
+
   /** 导出的服务（可供其他模块使用） */
   exports?: any[];
-  
+
   /** 模块引导组件 */
   bootstrap?: any[];
-  
+
   /** 模块声明的组件/指令/管道 */
   declarations?: any[];
 }
@@ -35,7 +35,7 @@ export interface ModuleWithProviders<T = any> {
  * 模块类型
  */
 export interface ModuleClass<T = any> {
-  new (...args: any[]): T;
+  new(...args: any[]): T;
 }
 
 /**
@@ -44,10 +44,10 @@ export interface ModuleClass<T = any> {
 export interface ModuleOptions extends ModuleMetadata {
   /** 模块名称 */
   name?: string;
-  
+
   /** 模块版本 */
   version?: string;
-  
+
   /** 是否为根模块 */
   isRoot?: boolean;
 }
@@ -109,6 +109,7 @@ export function isModule(target: any): boolean {
  * 模块解析器
  * 负责解析模块依赖和合并提供者
  */
+@Injectable({ providedIn: 'root' })
 export class ModuleResolver {
   private readonly resolvedModules = new Map<any, ResolvedModule>();
   private readonly resolvingModules = new Set<any>();
@@ -121,7 +122,7 @@ export class ModuleResolver {
    */
   resolve(moduleOrConfig: ModuleClass | ModuleWithProviders): ResolvedModule {
     const moduleClass = this.extractModuleClass(moduleOrConfig);
-    
+
     // 检查是否已解析
     if (this.resolvedModules.has(moduleClass)) {
       return this.resolvedModules.get(moduleClass)!;
@@ -160,10 +161,10 @@ export class ModuleResolver {
   private doResolve(moduleOrConfig: ModuleClass | ModuleWithProviders): ResolvedModule {
     const moduleClass = this.extractModuleClass(moduleOrConfig);
     const metadata = getModuleMetadata(moduleClass) || {};
-    
+
     // 获取直接提供者
     const directProviders = metadata.providers || [];
-    
+
     // 如果是 ModuleWithProviders，添加额外提供者
     if ('providers' in moduleOrConfig) {
       directProviders.push(...moduleOrConfig.providers);
@@ -212,19 +213,19 @@ export class ModuleResolver {
 export interface ResolvedModule {
   /** 模块类 */
   moduleClass: ModuleClass;
-  
+
   /** 原始元数据 */
   metadata: ModuleOptions;
-  
+
   /** 合并后的提供者 */
   providers: Provider[];
-  
+
   /** 导入的模块 */
   imports: ResolvedModule[];
-  
+
   /** 导出的服务 */
   exports: any[];
-  
+
   /** 是否已解析 */
   isResolved: boolean;
 }
@@ -300,12 +301,12 @@ export class ModuleUtils {
    * @returns 平台扩展
    */
   static toPlatformExtension(
-    moduleOrConfig: ModuleClass | ModuleWithProviders, 
+    moduleOrConfig: ModuleClass | ModuleWithProviders,
     name?: string
   ): PlatformExtension {
     const resolved = moduleResolver.resolve(moduleOrConfig);
     const moduleClass = resolved.moduleClass;
-    
+
     return {
       name: name || moduleClass.name || 'unknown-module',
       providers: resolved.providers,

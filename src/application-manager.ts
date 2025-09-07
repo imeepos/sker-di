@@ -1,10 +1,12 @@
 import { EnvironmentInjector } from './environment-injector';
 import { Provider } from './provider';
 import { OnDestroy } from './lifecycle';
-import { InjectionTokenType } from './injector';
-import { APPLICATION_CONFIG, APPLICATION_BOOTSTRAP_CONTEXT, BaseApplicationConfig, ApplicationBootstrapContext } from './application-config';
-import { getDebugger, DebugEventType } from './debug';
+import { InjectionTokenType, Injector } from './injector';
+import { APPLICATION_CONFIG, APPLICATION_BOOTSTRAP_CONTEXT, BaseApplicationConfig, ApplicationBootstrapContext, ApplicationConfig } from './application-config';
+import { IDIDebugger, DI_DEBUGGER, DebugEventType } from './debug';
 import { FeatureRef, createFeatureRef } from './feature-ref';
+import { Injectable } from './injectable';
+import { Inject } from './inject';
 
 /**
  * 应用状态枚举
@@ -37,54 +39,61 @@ export interface ApplicationFeature {
 /**
  * 应用引用接口
  */
-export interface ApplicationRef<T = any> extends OnDestroy {
+export abstract class ApplicationRef<T = any> {
   /** 应用ID（唯一标识） */
-  readonly id: string;
+  abstract readonly id: string;
   /** 应用名称 */
-  readonly name: string;
+  abstract readonly name: string;
   /** 应用状态 */
-  readonly state: ApplicationState;
+  abstract readonly state: ApplicationState;
   /** 应用注入器 */
-  readonly injector: EnvironmentInjector;
+  abstract readonly injector: Injector;
   /** 应用是否已销毁 */
-  readonly isDestroyed: boolean;
+  abstract readonly isDestroyed: boolean;
   /** 已加载的Features */
-  readonly features: ReadonlyMap<string, ApplicationFeature>;
+  abstract readonly features: ReadonlyMap<string, ApplicationFeature>;
 
   /** 已加载的FeatureRef实例 */
-  readonly featureRefs: ReadonlyMap<string, FeatureRef>;
+  abstract readonly featureRefs: ReadonlyMap<string, FeatureRef>;
 
   /** 引导应用组件 */
-  bootstrap<U = T>(componentOrToken?: InjectionTokenType<U>): U;
-  
+  abstract bootstrap<U = T>(componentOrToken?: InjectionTokenType<U>): U;
+
   /** 加载Feature */
-  loadFeature(feature: ApplicationFeature): Promise<void>;
-  
+  abstract loadFeature(feature: ApplicationFeature): Promise<void>;
+
   /** 卸载Feature */
-  unloadFeature(featureName: string): Promise<void>;
-  
+  abstract unloadFeature(featureName: string): Promise<void>;
+
   /** 重新加载Feature */
-  reloadFeature(feature: ApplicationFeature): Promise<void>;
-  
+  abstract reloadFeature(feature: ApplicationFeature): Promise<void>;
+
   /** 删除Feature */
-  deleteFeature(featureName: string): Promise<void>;
-  
+  abstract deleteFeature(featureName: string): Promise<void>;
+
   /** 获取FeatureRef */
-  getFeatureRef(featureName: string): FeatureRef | undefined;
-  
+  abstract getFeatureRef(featureName: string): FeatureRef | undefined;
+
   /** 销毁应用 */
-  destroy(): void;
+  abstract destroy(): void;
 }
 
 /**
  * 应用管理器 - 管理平台上的所有应用
  */
+@Injectable({ providedIn: 'root' })
 export class ApplicationManager implements OnDestroy {
   private readonly _applications = new Map<string, ApplicationRef>();
-  private readonly debugger = getDebugger();
   private _destroyed = false;
 
-  constructor(private readonly platformInjector: EnvironmentInjector) {}
+  constructor(
+    @Inject(DI_DEBUGGER) private readonly diDebugger: IDIDebugger
+  ) {
+    // 暂时使用全局方式获取平台注入器，后续需要改进
+    this.platformInjector = EnvironmentInjector.getPlatformInjector()!;
+  }
+
+  private readonly platformInjector: EnvironmentInjector;
 
   /**
    * 创建新应用
@@ -103,18 +112,22 @@ export class ApplicationManager implements OnDestroy {
     }
 
     // 创建应用注入器
-    const appInjector = this.createApplicationInjector(providers);
-    
+    const appInjector = this.createApplicationInjector([
+      ...providers,
+      {
+        provide: ApplicationRef,
+        useFactory: (injector: Injector, config: ApplicationConfig, diDebugger: IDIDebugger) => {
+          return new DefaultApplicationRef(config.name, config.name, injector, this, diDebugger)
+        },
+        deps: [Injector, APPLICATION_CONFIG, DI_DEBUGGER]
+      }
+    ]);
+
     // 获取应用配置
-    const config = this.getApplicationConfig(appInjector, id);
-    
+    const config = appInjector.get(APPLICATION_CONFIG);
+
     // 创建应用实例
-    const app = new DefaultApplicationRef(
-      id,
-      config.name || id,
-      appInjector,
-      this
-    );
+    const app = appInjector.get(ApplicationRef)
 
     // 注册应用
     this._applications.set(id, app);
@@ -125,7 +138,7 @@ export class ApplicationManager implements OnDestroy {
     }
 
     // 调试日志
-    this.debugger.logEvent({
+    this.diDebugger.logEvent({
       type: DebugEventType.PlatformEvent,
       injectorId: this.platformInjector.getInjectorId(),
       metadata: {
@@ -172,7 +185,7 @@ export class ApplicationManager implements OnDestroy {
     app.destroy();
     this._applications.delete(id);
 
-    this.debugger.logEvent({
+    this.diDebugger.logEvent({
       type: DebugEventType.PlatformEvent,
       injectorId: this.platformInjector.getInjectorId(),
       metadata: {
@@ -218,7 +231,7 @@ export class ApplicationManager implements OnDestroy {
   }
 
   private createApplicationInjector(providers: Provider[]): EnvironmentInjector {
-    return EnvironmentInjector.createApplicationInjector(providers);
+    return EnvironmentInjector.createApplicationInjector([...providers]);
   }
 
   private getApplicationConfig(injector: EnvironmentInjector, fallbackName: string): BaseApplicationConfig {
@@ -233,19 +246,20 @@ export class ApplicationManager implements OnDestroy {
 /**
  * 默认应用引用实现
  */
-export class DefaultApplicationRef<T = any> implements ApplicationRef<T> {
+export class DefaultApplicationRef<T = any> extends ApplicationRef<T> {
   private _state: ApplicationState = ApplicationState.BOOTSTRAPPING;
   private _destroyed = false;
   private readonly _features = new Map<string, ApplicationFeature>();
   private readonly _featureRefs = new Map<string, FeatureRef>();
-  private readonly debugger = getDebugger();
 
   constructor(
     public readonly id: string,
     public readonly name: string,
-    public readonly injector: EnvironmentInjector,
-    private readonly manager: ApplicationManager
+    public readonly injector: Injector,
+    private readonly manager: ApplicationManager,
+    private readonly diDebugger: IDIDebugger
   ) {
+    super();
     // 应用创建完成，状态变为运行中
     this._state = ApplicationState.RUNNING;
   }
@@ -314,7 +328,7 @@ export class DefaultApplicationRef<T = any> implements ApplicationRef<T> {
     this._features.set(feature.name, feature);
     this._featureRefs.set(feature.name, featureRef);
 
-    this.debugger.logEvent({
+    this.diDebugger.logEvent({
       type: DebugEventType.PlatformEvent,
       injectorId: this.injector.getInjectorId(),
       metadata: {
@@ -358,7 +372,7 @@ export class DefaultApplicationRef<T = any> implements ApplicationRef<T> {
     this._features.delete(featureName);
     this._featureRefs.delete(featureName);
 
-    this.debugger.logEvent({
+    this.diDebugger.logEvent({
       type: DebugEventType.PlatformEvent,
       injectorId: this.injector.getInjectorId(),
       metadata: {
@@ -396,7 +410,7 @@ export class DefaultApplicationRef<T = any> implements ApplicationRef<T> {
       this._features.delete(feature.name);
       this._featureRefs.delete(feature.name);
 
-      this.debugger.logEvent({
+      this.diDebugger.logEvent({
         type: DebugEventType.PlatformEvent,
         injectorId: this.injector.getInjectorId(),
         metadata: {
@@ -443,7 +457,7 @@ export class DefaultApplicationRef<T = any> implements ApplicationRef<T> {
     this._features.set(feature.name, feature);
     this._featureRefs.set(feature.name, newFeatureRef);
 
-    this.debugger.logEvent({
+    this.diDebugger.logEvent({
       type: DebugEventType.PlatformEvent,
       injectorId: this.injector.getInjectorId(),
       metadata: {
@@ -488,7 +502,7 @@ export class DefaultApplicationRef<T = any> implements ApplicationRef<T> {
     this._features.delete(featureName);
     this._featureRefs.delete(featureName);
 
-    this.debugger.logEvent({
+    this.diDebugger.logEvent({
       type: DebugEventType.PlatformEvent,
       injectorId: this.injector.getInjectorId(),
       metadata: {
@@ -519,7 +533,7 @@ export class DefaultApplicationRef<T = any> implements ApplicationRef<T> {
         console.error(`Error destroying featureRef ${featureRef.name}:`, error);
       }
     }
-    
+
     // 销毁所有Features
     const features = Array.from(this._features.values());
     for (const feature of features) {
@@ -543,7 +557,7 @@ export class DefaultApplicationRef<T = any> implements ApplicationRef<T> {
     this._destroyed = true;
     this._state = ApplicationState.DESTROYED;
 
-    this.debugger.logEvent({
+    this.diDebugger.logEvent({
       type: DebugEventType.PlatformEvent,
       injectorId: this.injector.getInjectorId(),
       metadata: {

@@ -18,4 +18,10 @@ export class NullInjector extends Injector {
     const tokenName = typeof token === 'function' ? token.name : token.toString();
     throw new Error(`NullInjector: No provider for ${tokenName}`);
   }
+
+  destroy(): void { }
+
+  getInjectorId(): string {
+    return `null_injector`
+  }
 }
