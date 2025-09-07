@@ -320,24 +320,58 @@ export function createFeatureInjector(providers: Provider[], parentInjector: Env
 // 🚀 平台架构系统 (扩展性增强)
 // ============================================================================
 
-// 平台引用和应用引用
+// 平台引用
 export {
   PlatformRef,
-  ApplicationRef,
   PlatformConfig,
   PlatformModule,
-  PlatformExtension,
-  DefaultApplicationRef
+  PlatformExtension
 } from './platform-ref';
+
+// 应用管理系统
+export {
+  ApplicationRef,
+  ApplicationState,
+  ApplicationFeature,
+  ApplicationManager,
+  DefaultApplicationRef
+} from './application-manager';
+
+// Feature引用系统
+export {
+  FeatureRef,
+  FeatureState,
+  DefaultFeatureRef,
+  createFeatureRef
+} from './feature-ref';
 
 // 平台工厂和管理
 export {
   createPlatformFactory,
   getPlatform,
   destroyPlatform,
-  destroyAllPlatforms,
-  getPlatformNames
+  hasPlatform
 } from './platform-factory';
+
+// 应用配置系统
+export {
+  ApplicationConfig,
+  BaseApplicationConfig,
+  WebApplicationConfig,
+  MicroserviceApplicationConfig,
+  DesktopApplicationConfig,
+  MobileApplicationConfig,
+  ApplicationBootstrapContext,
+  ApplicationConfigFactory,
+  APPLICATION_CONFIG,
+  APPLICATION_BOOTSTRAP_CONTEXT,
+  WEB_APPLICATION_CONFIG,
+  MICROSERVICE_APPLICATION_CONFIG,
+  DESKTOP_APPLICATION_CONFIG,
+  MOBILE_APPLICATION_CONFIG,
+  provideApplicationConfig,
+  provideApplicationConfigFactory
+} from './application-config';
 
 // 模块系统
 export {

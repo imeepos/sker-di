@@ -1,7 +1,10 @@
-import { PlatformRef, PlatformFactory, PlatformModule, PlatformConfig, ApplicationRef, DefaultApplicationRef, PlatformExtension } from './platform-ref';
+import { PlatformRef, PlatformFactory, PlatformModule, PlatformConfig, PlatformExtension } from './platform-ref';
+import { ApplicationRef } from './application-manager';
 import { EnvironmentInjector } from './environment-injector';
 import { Provider } from './provider';
 import { getDebugger, DebugEventType } from './debug';
+import { APPLICATION_CONFIG, APPLICATION_BOOTSTRAP_CONTEXT, BaseApplicationConfig, ApplicationBootstrapContext } from './application-config';
+import { ApplicationManager, ApplicationFeature } from './application-manager';
 
 /**
  * 具体的平台实现
@@ -10,6 +13,7 @@ class Platform extends PlatformRef {
   private _destroyed = false;
   private readonly debugger = getDebugger();
   private readonly extensions: PlatformExtension[] = [];
+  private readonly applicationManager: ApplicationManager;
 
   constructor(
     public readonly injector: EnvironmentInjector,
@@ -18,6 +22,7 @@ class Platform extends PlatformRef {
   ) {
     super();
     this.extensions = extensions;
+    this.applicationManager = new ApplicationManager(injector);
     this.initializeExtensions();
   }
 
@@ -25,37 +30,159 @@ class Platform extends PlatformRef {
     return this._destroyed;
   }
 
-  async bootstrapApplication(providers: Provider[] = [], options: any = {}): Promise<ApplicationRef> {
+  get applications(): ReadonlyMap<string, ApplicationRef<any>> {
+    const apps = this.applicationManager.getApplications();
+    const map = new Map<string, ApplicationRef<any>>();
+    for (const app of apps) {
+      map.set(app.id, app);
+    }
+    return map;
+  }
+
+  async bootstrapApplication(
+    providersOrAppId?: Provider[] | string, 
+    providersOrOptions?: Provider[],
+    features?: ApplicationFeature[]
+  ): Promise<ApplicationRef> {
     if (this._destroyed) {
       throw new Error('Cannot bootstrap application on destroyed platform');
     }
 
-    // 创建应用注入器
-    const appInjector = this.createApplicationInjector(providers);
-    
-    // 创建应用引用
-    const appRef = new DefaultApplicationRef(appInjector, this);
-    
-    // 注册应用
-    const appName = options.name || `app-${Date.now()}`;
-    this.applications.set(appName, appRef);
+    let appId: string;
+    let providers: Provider[] = [];
+    let appFeatures: ApplicationFeature[] = features || [];
 
-    // 调试日志
-    this.debugger.logEvent({
-      type: DebugEventType.PlatformEvent,
-      injectorId: this.injector.getInjectorId(),
-      metadata: {
-        action: 'bootstrapApplication',
-        appName,
-        providersCount: providers.length
+    // 处理参数重载
+    if (typeof providersOrAppId === 'string') {
+      // 新方式：bootstrapApplication(appId, providers, features)
+      appId = providersOrAppId;
+      if (Array.isArray(providersOrOptions)) {
+        providers = providersOrOptions;
       }
-    });
+    } else {
+      // 兼容旧方式：bootstrapApplication(providers)
+      providers = providersOrAppId || [];
+      
+      // 生成应用ID
+      let appName: string;
+      const hasApplicationConfig = providers.some(provider => 
+        provider.provide === APPLICATION_CONFIG || 
+        provider.provide === APPLICATION_BOOTSTRAP_CONTEXT
+      );
 
-    return appRef;
+      if (hasApplicationConfig) {
+        const tempInjector = this.createApplicationInjector(providers);
+        try {
+          const appConfig = tempInjector.get(APPLICATION_CONFIG);
+          appName = appConfig?.name || `app-${Date.now()}`;
+        } catch {
+          appName = `app-${Date.now()}`;
+        }
+      } else {
+        appName = `app-${Date.now()}`;
+        providers.push(
+          { provide: APPLICATION_CONFIG, useValue: { name: appName } },
+          {
+            provide: APPLICATION_BOOTSTRAP_CONTEXT,
+            useValue: {
+              bootstrapTime: Date.now(),
+              platformName: this.config.name,
+              environment: typeof process !== 'undefined' ? process.env : {}
+            } as ApplicationBootstrapContext
+          }
+        );
+      }
+      
+      appId = appName;
+    }
+
+    // 确保启动上下文包含正确的平台名称
+    const contextProviderIndex = providers.findIndex(p => p.provide === APPLICATION_BOOTSTRAP_CONTEXT);
+    if (contextProviderIndex >= 0) {
+      providers[contextProviderIndex] = {
+        provide: APPLICATION_BOOTSTRAP_CONTEXT,
+        useValue: {
+          bootstrapTime: Date.now(),
+          platformName: this.config.name,
+          environment: typeof process !== 'undefined' ? process.env : {}
+        } as ApplicationBootstrapContext
+      };
+    }
+
+    // 使用ApplicationManager创建应用
+    return await this.applicationManager.createApplication(appId, providers, appFeatures);
   }
 
   createApplicationInjector(providers: Provider[] = []): EnvironmentInjector {
     return EnvironmentInjector.createApplicationInjector(providers);
+  }
+
+  /**
+   * 获取应用
+   */
+  getApplication<T = any>(id: string): ApplicationRef<T> | undefined {
+    return this.applicationManager.getApplication<T>(id);
+  }
+
+  /**
+   * 获取所有应用
+   */
+  getApplications(): ApplicationRef[] {
+    return this.applicationManager.getApplications();
+  }
+
+  /**
+   * 获取所有应用ID
+   */
+  getApplicationIds(): string[] {
+    return this.applicationManager.getApplicationIds();
+  }
+
+  /**
+   * 销毁应用
+   */
+  async destroyApplication(id: string): Promise<boolean> {
+    return await this.applicationManager.destroyApplication(id);
+  }
+
+  /**
+   * 重新加载应用
+   */
+  async reloadApplication(id: string, providers?: Provider[], features?: ApplicationFeature[]): Promise<ApplicationRef> {
+    if (this._destroyed) {
+      throw new Error('Cannot reload application on destroyed platform');
+    }
+
+    const existingApp = this.applicationManager.getApplication(id);
+    if (!existingApp) {
+      throw new Error(`Application with id '${id}' does not exist`);
+    }
+
+    // 保存现有应用的配置
+    const oldAppConfig = {
+      name: existingApp.name,
+      state: existingApp.state,
+      loadedFeatures: Array.from(existingApp.features.values())
+    };
+
+    // 销毁现有应用
+    await this.applicationManager.destroyApplication(id);
+
+    // 使用相同ID重新创建应用
+    try {
+      const newProviders = providers || [];
+      const newFeatures = features || oldAppConfig.loadedFeatures;
+      
+      return await this.applicationManager.createApplication(id, newProviders, newFeatures);
+    } catch (error) {
+      // 如果重新创建失败，尝试恢复原应用（使用旧Features）
+      try {
+        await this.applicationManager.createApplication(id, [], oldAppConfig.loadedFeatures);
+      } catch (restoreError) {
+        console.error(`Failed to restore application '${id}' after reload failure:`, restoreError);
+      }
+      throw error;
+    }
   }
 
   destroy(): void {
@@ -65,11 +192,11 @@ class Platform extends PlatformRef {
 
     this._destroyed = true;
 
+    // 销毁所有应用
+    this.applicationManager.destroy();
+
     // 销毁扩展
     this.destroyExtensions();
-
-    // 调用父类销毁逻辑
-    super.destroy();
 
     // 调试日志
     this.debugger.logEvent({
@@ -80,6 +207,15 @@ class Platform extends PlatformRef {
         platformName: this.config.name
       }
     });
+
+    // 销毁注入器
+    this.injector.destroy();
+
+    // 清除全局平台引用
+    GlobalPlatform.clearInstance();
+
+    // 清除全局注入器实例
+    (EnvironmentInjector as any).platformInjectorInstance = null;
   }
 
   private async initializeExtensions(): Promise<void> {
@@ -108,75 +244,40 @@ class Platform extends PlatformRef {
 }
 
 /**
- * 全局平台注册表
+ * 全局单一平台管理器
  */
-class PlatformRegistry {
-  private static platforms = new Map<string, PlatformRef>();
-  private static defaultPlatform: PlatformRef | null = null;
+class GlobalPlatform {
+  private static instance: PlatformRef | null = null;
 
   /**
-   * 注册平台
+   * 设置全局平台实例
    */
-  static register(name: string, platform: PlatformRef): void {
-    if (this.platforms.has(name)) {
-      throw new Error(`Platform ${name} already registered`);
+  static setInstance(platform: PlatformRef): void {
+    if (this.instance && !this.instance.destroyed) {
+      throw new Error('A platform instance already exists. Only one platform can exist at a time.');
     }
-    this.platforms.set(name, platform);
+    this.instance = platform;
   }
 
   /**
-   * 获取平台
+   * 获取全局平台实例
    */
-  static get(name: string): PlatformRef | undefined {
-    return this.platforms.get(name);
+  static getInstance(): PlatformRef | null {
+    return this.instance;
   }
 
   /**
-   * 获取默认平台
+   * 清除全局平台实例
    */
-  static getDefault(): PlatformRef | null {
-    return this.defaultPlatform;
+  static clearInstance(): void {
+    this.instance = null;
   }
 
   /**
-   * 设置默认平台
+   * 检查是否存在平台实例
    */
-  static setDefault(platform: PlatformRef): void {
-    this.defaultPlatform = platform;
-  }
-
-  /**
-   * 销毁平台
-   */
-  static destroy(name: string): boolean {
-    const platform = this.platforms.get(name);
-    if (platform) {
-      platform.destroy();
-      this.platforms.delete(name);
-      if (this.defaultPlatform === platform) {
-        this.defaultPlatform = null;
-      }
-      return true;
-    }
-    return false;
-  }
-
-  /**
-   * 销毁所有平台
-   */
-  static destroyAll(): void {
-    for (const [name, platform] of this.platforms) {
-      platform.destroy();
-    }
-    this.platforms.clear();
-    this.defaultPlatform = null;
-  }
-
-  /**
-   * 获取所有平台名称
-   */
-  static getNames(): string[] {
-    return Array.from(this.platforms.keys());
+  static hasInstance(): boolean {
+    return this.instance !== null && !this.instance.destroyed;
   }
 }
 
@@ -223,9 +324,10 @@ export function createPlatformFactory(
   module: PlatformModule
 ): PlatformFactory {
   return function platformFactory(extraProviders: Provider[] = []): PlatformRef {
-    // 检查是否已存在同名平台
-    const existingPlatform = PlatformRegistry.get(module.config.name);
-    if (existingPlatform && !existingPlatform.destroyed) {
+    // 检查是否已存在平台实例
+    if (GlobalPlatform.hasInstance()) {
+      const existingPlatform = GlobalPlatform.getInstance()!;
+      console.warn('Platform already exists. Returning existing platform instance.');
       return existingPlatform;
     }
 
@@ -276,67 +378,42 @@ export function createPlatformFactory(
       module.extensions || []
     );
 
-    // 注册平台
-    PlatformRegistry.register(module.config.name, platform);
-
-    // 如果这是第一个平台，设置为默认平台
-    if (!PlatformRegistry.getDefault()) {
-      PlatformRegistry.setDefault(platform);
-    }
+    // 设置为全局平台实例
+    GlobalPlatform.setInstance(platform);
 
     return platform;
   };
 }
 
 /**
- * 获取平台
- * @param name 平台名称，如果不提供则返回默认平台
+ * 获取全局平台实例
  */
-export function getPlatform(name?: string): PlatformRef | null {
-  if (name) {
-    return PlatformRegistry.get(name) || null;
-  }
-  return PlatformRegistry.getDefault();
+export function getPlatform(): PlatformRef | null {
+  return GlobalPlatform.getInstance();
 }
 
 /**
- * 销毁平台
- * @param name 平台名称，如果不提供则销毁默认平台
+ * 销毁全局平台实例
  */
-export function destroyPlatform(name?: string): boolean {
-  if (name) {
-    return PlatformRegistry.destroy(name);
-  }
-  
-  const defaultPlatform = PlatformRegistry.getDefault();
-  if (defaultPlatform) {
-    // 找到默认平台的名称并销毁
-    for (const [platformName, platform] of (PlatformRegistry as any).platforms) {
-      if (platform === defaultPlatform) {
-        return PlatformRegistry.destroy(platformName);
-      }
-    }
+export function destroyPlatform(): boolean {
+  const platform = GlobalPlatform.getInstance();
+  if (platform) {
+    platform.destroy();
+    return true;
   }
   return false;
 }
 
 /**
- * 获取所有已注册的平台名称
+ * 检查是否存在平台实例
  */
-export function getPlatformNames(): string[] {
-  return PlatformRegistry.getNames();
+export function hasPlatform(): boolean {
+  return GlobalPlatform.hasInstance();
 }
 
-/**
- * 销毁所有平台
- */
-export function destroyAllPlatforms(): void {
-  PlatformRegistry.destroyAll();
-}
-
-// 在模块卸载时清理所有平台
+// 在模块卸载时清理平台
 if (typeof process !== 'undefined' && process.on) {
   process.on('exit', () => {
-    PlatformRegistry.destroyAll();
+    destroyPlatform();
   });
 }

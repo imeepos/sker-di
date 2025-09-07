@@ -1,5 +1,5 @@
 // 使用标准的 Jest 全局变量，不需要从 @jest/globals 导入
-import { createPlatformFactory, getPlatform, destroyPlatform, destroyAllPlatforms } from './platform-factory';
+import { createPlatformFactory, getPlatform, destroyPlatform } from './platform-factory';
 import { PlatformRef, PlatformModule } from './platform-ref';
 import { Module, ModuleUtils, moduleResolver, MODULE_METADATA_KEY } from './module-system';
 import { 
@@ -21,14 +21,17 @@ import { Provider } from './provider';
 describe('Platform Architecture 扩展性测试', () => {
   beforeEach(() => {
     // 重置全局状态
-    destroyAllPlatforms();
+    destroyPlatform();
     moduleResolver.clear();
     // 重置根注入器和平台注入器
     require('./environment-injector').EnvironmentInjector.resetRootInjector();
+    // 清理全局注入器实例以适配新架构
+    (require('./environment-injector').EnvironmentInjector as any).rootInjectorInstance = null;
+    (require('./environment-injector').EnvironmentInjector as any).platformInjectorInstance = null;
   });
 
   afterEach(() => {
-    destroyAllPlatforms();
+    destroyPlatform();
     moduleResolver.clear();
     // 重置根注入器和平台注入器
     require('./environment-injector').EnvironmentInjector.resetRootInjector();
@@ -51,29 +54,6 @@ describe('Platform Architecture 扩展性测试', () => {
       expect(platform.injector.get('CORE_CONFIG')).toEqual({ debug: true });
     });
 
-    it('应该支持平台继承', () => {
-      // 创建基础平台
-      const basePlatform = createPlatformFactory(null, {
-        config: { name: 'base', version: '1.0.0' },
-        providers: [
-          { provide: 'BASE_SERVICE', useValue: 'base-value' }
-        ]
-      });
-
-      // 创建继承平台
-      const extendedPlatform = createPlatformFactory(basePlatform, {
-        config: { name: 'extended', version: '1.0.0' },
-        providers: [
-          { provide: 'EXTENDED_SERVICE', useValue: 'extended-value' }
-        ]
-      });
-
-      const platform = extendedPlatform();
-
-      // 可以访问继承的服务
-      expect(platform.injector.get('BASE_SERVICE')).toBe('base-value');
-      expect(platform.injector.get('EXTENDED_SERVICE')).toBe('extended-value');
-    });
 
     it('应该确保平台单例性', () => {
       const platformFactory = createPlatformFactory(null, {
@@ -290,8 +270,8 @@ describe('Platform Architecture 扩展性测试', () => {
 
       const platform = platformFactory();
 
-      const app1 = await platform.bootstrapApplication([], { name: 'app1' });
-      const app2 = await platform.bootstrapApplication([], { name: 'app2' });
+      const app1 = await platform.bootstrapApplication('app1', []);
+      const app2 = await platform.bootstrapApplication('app2', []);
 
       expect(platform.getApplication('app1')).toBe(app1);
       expect(platform.getApplication('app2')).toBe(app2);
@@ -318,18 +298,11 @@ describe('Platform Architecture 扩展性测试', () => {
 
   describe('🌐 Web平台示例', () => {
     it('应该能创建完整的Web平台', async () => {
-      // 创建核心平台
-      const corePlatform = createPlatformFactory(null, {
-        config: { name: 'core', version: '1.0.0', enableDebug: true },
+      // 创建Web平台（包含所有服务）
+      const webPlatform = createPlatformFactory(null, {
+        config: { name: 'web', version: '2.0.0', enableDebug: true },
         providers: [
-          { provide: 'ENVIRONMENT', useValue: 'production' }
-        ]
-      });
-
-      // 创建Web平台（继承核心平台）
-      const webPlatform = createPlatformFactory(corePlatform, {
-        config: { name: 'web', version: '2.0.0' },
-        providers: [
+          { provide: 'ENVIRONMENT', useValue: 'production' },
           { provide: 'PLATFORM_TYPE', useValue: 'web' }
         ],
         extensions: [

@@ -1,7 +1,8 @@
 import { EnvironmentInjector } from './environment-injector';
 import { Provider } from './provider';
-import { Injector } from './injector';
+import { Injector, InjectionTokenType } from './injector';
 import { OnDestroy } from './lifecycle';
+import { ApplicationRef, ApplicationFeature } from './application-manager';
 
 /**
  * 平台配置选项
@@ -17,23 +18,8 @@ export interface PlatformConfig {
   [key: string]: any;
 }
 
-/**
- * 应用引用接口
- * 表示一个运行中的应用实例
- */
-export interface ApplicationRef extends OnDestroy {
-  /** 应用注入器 */
-  readonly injector: EnvironmentInjector;
-  
-  /** 应用是否已销毁 */
-  readonly isDestroyed: boolean;
-  
-  /** 引导应用 */
-  bootstrap<T>(componentOrToken?: any): T;
-  
-  /** 销毁应用 */
-  destroy(): void;
-}
+
+// ApplicationRef 现在从 './application-manager' 导入
 
 /**
  * 平台引用抽象类
@@ -49,15 +35,17 @@ export abstract class PlatformRef implements OnDestroy {
   /** 平台是否已销毁 */
   abstract readonly destroyed: boolean;
   
-  /** 注册的应用列表 */
-  protected readonly applications = new Map<string, ApplicationRef>();
+  /** 获取应用列表（只读） */
+  abstract readonly applications: ReadonlyMap<string, ApplicationRef<any>>;
 
   /**
    * 引导应用
-   * @param providers 应用级提供者
-   * @param options 引导选项
    */
-  abstract bootstrapApplication(providers?: Provider[], options?: any): Promise<ApplicationRef>;
+  abstract bootstrapApplication(
+    providersOrAppId?: Provider[] | string, 
+    providersOrOptions?: Provider[],
+    features?: ApplicationFeature[]
+  ): Promise<ApplicationRef>;
 
   /**
    * 创建应用注入器
@@ -67,36 +55,38 @@ export abstract class PlatformRef implements OnDestroy {
 
   /**
    * 获取已注册的应用
-   * @param name 应用名称
+   * @param id 应用ID
    */
-  getApplication(name: string): ApplicationRef | undefined {
-    return this.applications.get(name);
-  }
+  abstract getApplication<T = any>(id: string): ApplicationRef<T> | undefined;
 
   /**
    * 获取所有应用
    */
-  getApplications(): ApplicationRef[] {
-    return Array.from(this.applications.values());
-  }
+  abstract getApplications(): ApplicationRef<any>[];
+
+  /**
+   * 获取所有应用ID
+   */
+  abstract getApplicationIds(): string[];
+
+  /**
+   * 销毁应用
+   * @param id 应用ID
+   */
+  abstract destroyApplication(id: string): Promise<boolean>;
+
+  /**
+   * 重新加载应用
+   * @param id 应用ID
+   * @param providers 新的提供者（可选）
+   * @param features 新的Features（可选）
+   */
+  abstract reloadApplication(id: string, providers?: Provider[], features?: ApplicationFeature[]): Promise<ApplicationRef>;
 
   /**
    * 销毁平台及所有应用
    */
-  destroy(): void {
-    if (this.destroyed) {
-      return;
-    }
-
-    // 销毁所有应用
-    for (const app of this.applications.values()) {
-      app.destroy();
-    }
-    this.applications.clear();
-
-    // 销毁平台注入器
-    this.injector.destroy();
-  }
+  abstract destroy(): void;
 
   ngOnDestroy(): void {
     this.destroy();
@@ -142,45 +132,4 @@ export interface PlatformExtension {
   destroy?(platform: PlatformRef): void | Promise<void>;
 }
 
-/**
- * 默认应用引用实现
- */
-export class DefaultApplicationRef implements ApplicationRef {
-  private _destroyed = false;
-
-  constructor(
-    public readonly injector: EnvironmentInjector,
-    private readonly platform: PlatformRef
-  ) {}
-
-  get isDestroyed(): boolean {
-    return this._destroyed;
-  }
-
-  bootstrap<T>(componentOrToken?: any): T {
-    if (this._destroyed) {
-      throw new Error('Cannot bootstrap destroyed application');
-    }
-
-    // 如果没有指定组件/令牌，返回注入器本身
-    if (!componentOrToken) {
-      return this.injector as any;
-    }
-
-    // 从注入器获取组件实例
-    return this.injector.get(componentOrToken);
-  }
-
-  destroy(): void {
-    if (this._destroyed) {
-      return;
-    }
-
-    this._destroyed = true;
-    this.injector.destroy();
-  }
-
-  ngOnDestroy(): void {
-    this.destroy();
-  }
-}
+// DefaultApplicationRef 已迁移到 application-manager.ts

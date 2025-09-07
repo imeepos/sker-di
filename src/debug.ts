@@ -19,6 +19,7 @@ export enum DebugEventType {
   InjectorCreated = 'injector-created',
   ProviderRegistered = 'provider-registered',
   PlatformEvent = 'platform-event',
+  FeatureEvent = 'feature-event',
   DependencyRequested = 'dependency-requested',
   DependencyResolved = 'dependency-resolved',
   InstanceCreated = 'instance-created',
