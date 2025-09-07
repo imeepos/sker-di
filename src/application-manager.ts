@@ -117,7 +117,7 @@ export class ApplicationManager implements OnDestroy {
       {
         provide: ApplicationRef,
         useFactory: (injector: Injector, config: ApplicationConfig, diDebugger: IDIDebugger) => {
-          return new DefaultApplicationRef(config.name, config.name, injector, this, diDebugger)
+          return new DefaultApplicationRef(id, config.name, injector, this, diDebugger)
         },
         deps: [Injector, APPLICATION_CONFIG, DI_DEBUGGER]
       }

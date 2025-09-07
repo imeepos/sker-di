@@ -61,6 +61,28 @@ class Platform extends PlatformRef {
       if (Array.isArray(providersOrOptions)) {
         providers = providersOrOptions;
       }
+      
+      // 检查并添加默认APPLICATION_CONFIG（如果没有提供的话）
+      const hasApplicationConfig = providers.some(provider => 
+        ('provide' in provider) && (
+          provider.provide === APPLICATION_CONFIG || 
+          provider.provide === APPLICATION_BOOTSTRAP_CONTEXT
+        )
+      );
+      
+      if (!hasApplicationConfig) {
+        providers.push(
+          { provide: APPLICATION_CONFIG, useValue: { name: appId } },
+          {
+            provide: APPLICATION_BOOTSTRAP_CONTEXT,
+            useValue: {
+              bootstrapTime: Date.now(),
+              platformName: this.config.name,
+              environment: typeof process !== 'undefined' ? process.env : {}
+            } as ApplicationBootstrapContext
+          }
+        );
+      }
     } else {
       // 兼容旧方式：bootstrapApplication(providers)
       providers = providersOrAppId || [];
@@ -177,11 +199,44 @@ class Platform extends PlatformRef {
       const newProviders = providers || [];
       const newFeatures = features || oldAppConfig.loadedFeatures;
       
+      // 确保有APPLICATION_CONFIG配置
+      const hasApplicationConfig = newProviders.some(provider => 
+        ('provide' in provider) && (
+          provider.provide === APPLICATION_CONFIG || 
+          provider.provide === APPLICATION_BOOTSTRAP_CONTEXT
+        )
+      );
+      
+      if (!hasApplicationConfig) {
+        newProviders.push(
+          { provide: APPLICATION_CONFIG, useValue: { name: oldAppConfig.name } },
+          {
+            provide: APPLICATION_BOOTSTRAP_CONTEXT,
+            useValue: {
+              bootstrapTime: Date.now(),
+              platformName: this.config.name,
+              environment: typeof process !== 'undefined' ? process.env : {}
+            } as ApplicationBootstrapContext
+          }
+        );
+      }
+      
       return await this.applicationManager.createApplication(id, newProviders, newFeatures);
     } catch (error) {
       // 如果重新创建失败，尝试恢复原应用（使用旧Features）
       try {
-        await this.applicationManager.createApplication(id, [], oldAppConfig.loadedFeatures);
+        const restoreProviders = [
+          { provide: APPLICATION_CONFIG, useValue: { name: oldAppConfig.name } },
+          {
+            provide: APPLICATION_BOOTSTRAP_CONTEXT,
+            useValue: {
+              bootstrapTime: Date.now(),
+              platformName: this.config.name,
+              environment: typeof process !== 'undefined' ? process.env : {}
+            } as ApplicationBootstrapContext
+          }
+        ];
+        await this.applicationManager.createApplication(id, restoreProviders, oldAppConfig.loadedFeatures);
       } catch (restoreError) {
         console.error(`Failed to restore application '${id}' after reload failure:`, restoreError);
       }
