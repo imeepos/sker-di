@@ -227,10 +227,10 @@ plugins.forEach(plugin => {
 
 ### 如何使用注入上下文？
 
-注入上下文允许在没有注入器实例的情况下进行依赖解析！
+注入上下文允许在特定注入器环境中执行函数！
 
 ```typescript
-import { runInInjectionContext, inject, Injectable, createInjector } from '@sker/di';
+import { runInInjectionContext, getCurrentInjectionContext, assertInInjectionContext, Injectable, createInjector } from '@sker/di';
 
 @Injectable({ providedIn: 'root' })
 class ConfigService {
@@ -238,8 +238,9 @@ class ConfigService {
 }
 
 function useConfig() {
-  // 在注入上下文中使用 inject 函数
-  const configService = inject(ConfigService);
+  // 断言当前在注入上下文中
+  const currentInjector = assertInInjectionContext('useConfig 必须在注入上下文中调用');
+  const configService = currentInjector.get(ConfigService);
   return configService.getConfig();
 }
 
@@ -251,41 +252,45 @@ const config = runInInjectionContext(injector, () => {
 });
 
 console.log(config); // { theme: 'dark', lang: 'zh' }
+
+// 检查当前是否在注入上下文中
+const currentContext = getCurrentInjectionContext(); // 在上下文外返回 null
 ```
 
 ## 🛠️ 平台架构系统
 
 ### 如何使用平台工厂？
 
-平台工厂提供了创建和管理多个命名平台的能力！
+平台工厂提供了创建全局单例平台的能力，支持扩展机制！
 
 ```typescript
-import { createPlatformFactory, getPlatform, PlatformRef, Module } from '@sker/di';
+import { createPlatformFactory, getPlatform, destroyPlatform, PlatformRef, PlatformModule } from '@sker/di';
 
-@Module({
+// 定义平台模块
+const webPlatformModule: PlatformModule = {
+  config: { name: 'web-platform', version: '1.0.0' },
   providers: [
+    { provide: 'PLATFORM_TYPE', useValue: 'web' },
     { provide: 'PLATFORM_NAME', useValue: 'WebPlatform' }
-  ]
-})
-class WebPlatformModule {}
-
-// 创建平台工厂
-const createWebPlatform = createPlatformFactory({
-  name: 'web',
-  providers: [
-    { provide: 'PLATFORM_TYPE', useValue: 'web' }
   ],
-  modules: [WebPlatformModule]
-});
+  extensions: [] // 可选的平台扩展
+};
 
-// 创建平台实例
+// 创建平台工厂函数
+const createWebPlatform = createPlatformFactory(null, webPlatformModule);
+
+// 创建平台实例（全局单例）
 const platform = createWebPlatform();
 const platformName = platform.injector.get('PLATFORM_NAME');
 console.log(platformName); // WebPlatform
 
 // 获取已存在的平台
-const existingPlatform = getPlatform('web');
+const existingPlatform = getPlatform();
 console.log(existingPlatform === platform); // true
+
+// 销毁平台
+destroyPlatform();
+console.log(getPlatform()); // null
 ```
 
 ### 如何使用模块系统？
@@ -326,9 +331,11 @@ class UserModule {}
 
 // 解析模块并创建注入器
 const resolvedModule = moduleResolver.resolve(UserModule);
-const providers = moduleResolver.collectProviders([resolvedModule]);
 
-const appInjector = createApplicationInjector(providers);
+// 从解析的模块中获取提供者
+const allProviders = resolvedModule.providers;
+
+const appInjector = createApplicationInjector(allProviders);
 const userService = appInjector.get(UserService);
 const apiUrl = appInjector.get('API_BASE_URL'); // 从 CoreModule 导出
 ```
@@ -345,9 +352,9 @@ import { enableDevMode, createInjector, Injectable, getDebugger } from '@sker/di
 // 启用调试模式
 enableDevMode({
   logToConsole: true,
-  enablePerformanceTracking: true,
+  collectMetrics: true,
   maxEventHistory: 1000,
-  enableCircularDependencyDetection: true
+  includeStackTrace: true
 });
 
 @Injectable({ providedIn: 'root' })
@@ -412,8 +419,8 @@ const tokens = inspector.searchTokens('User');
 console.log('找到的令牌:', tokens);
 
 // 健康检查
-const health = inspector.healthCheck();
-console.log('健康状态:', health.isHealthy ? '良好' : '异常');
+const health = inspector.validateHealth();
+console.log('健康状态检查结果:', health);
 
 // 生成完整报告
 const report = inspector.generateReport();
@@ -540,7 +547,7 @@ import { enableDevMode, createInjector, Injectable, getDebugger } from '@sker/di
 
 // 启用性能跟踪
 enableDevMode({
-  enablePerformanceTracking: true,
+  collectMetrics: true,
   logToConsole: false
 });
 
@@ -565,13 +572,13 @@ for (let i = 0; i < 1000; i++) {
 
 // 检查性能指标
 const debugger = getDebugger();
-const metrics = debugger.getPerformanceMetrics();
+const debugInfo = debugger.getDebugInfo();
 
 console.log('性能指标:');
-console.log('- 解析次数:', metrics.resolutionCount);
-console.log('- 平均解析时间:', metrics.averageResolutionTime.toFixed(2), 'ms');
-console.log('- 缓存命中率:', (metrics.cacheHitRate * 100).toFixed(1), '%');
-console.log('- 总解析时间:', metrics.totalResolutionTime.toFixed(2), 'ms');
+console.log('- 总注入次数:', debugInfo.metrics.totalInjections);
+console.log('- 平均解析时间:', debugInfo.metrics.averageResolutionTime.toFixed(2), 'ms');
+console.log('- 缓存命中率:', (debugInfo.metrics.cacheHitRate * 100).toFixed(1), '%');
+console.log('- 实例总数:', debugInfo.metrics.totalInstancesCreated);
 ```
 
 ## 💡 最佳实践
@@ -758,10 +765,11 @@ try {
 ```typescript
 import { enableDevMode, createInjector, Injectable, Inject, forwardRef } from '@sker/di';
 
-// 启用循环依赖检测
+// 启用调试和跟踪
 enableDevMode({
-  enableCircularDependencyDetection: true,
-  logToConsole: true
+  collectMetrics: true,
+  logToConsole: true,
+  includeStackTrace: true
 });
 
 // 错误的循环依赖
@@ -807,6 +815,222 @@ const fixedA = goodInjector.get(FixedA); // 正常工作
 console.log('循环依赖已解决');
 ```
 
+## 🚨 常见错误和解决方案
+
+### TypeScript 依赖注入中的 `undefined` 错误
+
+**错误现象：**
+```
+TypeError: Cannot read properties of undefined (reading 'method')
+```
+
+**常见原因和解决方案：**
+
+#### 1. 缺少 `@Inject()` 装饰器
+
+**❌ 错误写法：**
+```typescript
+@Injectable({ providedIn: 'auto' })
+export class UserService {
+  constructor(
+    private logger: PlatformLoggerService,  // 缺少 @Inject 装饰器
+    private config: PlatformConfigService   // TypeScript 元数据可能不完整
+  ) {}
+  
+  getUser(id: string) {
+    this.logger.log('info', `获取用户: ${id}`); // ❌ this.logger 是 undefined
+  }
+}
+```
+
+**✅ 正确写法：**
+```typescript
+@Injectable({ providedIn: 'auto' })
+export class UserService {
+  constructor(
+    @Inject(PlatformLoggerService) private logger: PlatformLoggerService,
+    @Inject(PlatformConfigService) private config: PlatformConfigService
+  ) {}
+  
+  getUser(id: string) {
+    this.logger.log('info', `获取用户: ${id}`); // ✅ 正常工作
+  }
+}
+```
+
+**经验教训：**
+- **始终使用 `@Inject()` 装饰器** - 即使 TypeScript 能推断类型，也要显式指定注入令牌
+- **不要依赖 TypeScript 自动元数据** - 在复杂的依赖注入场景中，自动元数据可能不完整
+
+#### 2. 注入器作用域不匹配
+
+**❌ 错误写法：**
+```typescript
+// DataService 在根注入器中，但依赖平台级服务
+@Injectable({ providedIn: 'root' })
+export class DataService {
+  constructor(
+    @Inject(PlatformCacheService) private cache: PlatformCacheService  // 无法找到平台服务
+  ) {}
+}
+```
+
+**✅ 正确写法：**
+```typescript
+// DataService 应该在应用注入器中，这样能访问平台服务
+@Injectable({ providedIn: 'application' })
+export class DataService {
+  constructor(
+    @Inject(PlatformCacheService) private cache: PlatformCacheService  // ✅ 可以访问
+  ) {}
+}
+```
+
+**作用域访问规则：**
+- `root` 注入器：只能访问 `root` 级服务
+- `platform` 注入器：可以访问 `platform` 和 `root` 级服务  
+- `application` 注入器：可以访问 `application`、`platform` 和 `root` 级服务
+- `feature` 注入器：可以访问所有上级服务
+
+#### 3. 注入器层次结构错误
+
+**❌ 错误写法：**
+```typescript
+// 没有正确建立父子关系
+const rootInjector = createRootInjector();
+const platformInjector = createPlatformInjector(); // 没有设置父级
+const appInjector = createApplicationInjector();   // 父级关系混乱
+```
+
+**✅ 正确写法：**
+```typescript
+// 按正确顺序创建，自动建立层次结构
+const rootInjector = createRootInjector();        // 1. 先创建根注入器
+const platformInjector = createPlatformInjector(); // 2. 自动使用根注入器作为父级
+const appInjector = createApplicationInjector();   // 3. 自动使用平台注入器作为父级
+```
+
+### No provider for Service 错误
+
+**错误现象：**
+```
+NullInjector: No provider for PlatformCacheService
+```
+
+**常见原因和解决方案：**
+
+#### 1. 服务未正确注册
+```typescript
+// ❌ 服务声明了作用域但注入器中找不到
+@Injectable({ providedIn: 'platform' })
+class PlatformService {}
+
+// 在错误的注入器中查找
+const rootInjector = createRootInjector();
+const service = rootInjector.get(PlatformService); // ❌ 根注入器找不到平台服务
+
+// ✅ 正确的查找方式
+const platformInjector = createPlatformInjector();
+const service = platformInjector.get(PlatformService); // ✅ 在正确的注入器中查找
+```
+
+#### 2. 注入器创建顺序错误
+```typescript
+// ❌ 错误顺序
+const appInjector = createApplicationInjector();    // 找不到平台注入器
+const platformInjector = createPlatformInjector();  // 太晚了
+
+// ✅ 正确顺序  
+const rootInjector = createRootInjector();          // 1. 根
+const platformInjector = createPlatformInjector();  // 2. 平台
+const appInjector = createApplicationInjector();    // 3. 应用
+```
+
+### 循环依赖检测错误
+
+**错误现象：**
+```
+Error: Circular dependency detected
+```
+
+**解决方案：**
+```typescript
+// ✅ 使用 forwardRef 解决循环依赖
+@Injectable({ providedIn: null })
+class ServiceA {
+  constructor(@Inject(forwardRef(() => ServiceB)) private serviceB: ServiceB) {}
+}
+
+@Injectable({ providedIn: null })  
+class ServiceB {
+  constructor(@Inject(forwardRef(() => ServiceA)) private serviceA: ServiceA) {}
+}
+```
+
+## 📋 开发最佳实践清单
+
+### ✅ 依赖注入检查清单
+
+**服务定义：**
+- [ ] 所有服务类都使用 `@Injectable()` 装饰器
+- [ ] 明确指定 `providedIn` 作用域（`root`, `platform`, `application`, `feature`）
+- [ ] 构造函数参数都使用 `@Inject()` 装饰器（不要依赖自动推断）
+- [ ] 复杂依赖使用 `forwardRef()` 避免循环依赖
+
+**注入器创建：**
+- [ ] 按正确顺序创建注入器：Root → Platform → Application → Feature
+- [ ] 验证注入器父子关系是否正确
+- [ ] 在测试中使用 `resetRootInjector()` 确保隔离
+
+**错误处理：**
+- [ ] 可选依赖使用 `@Optional()` 装饰器
+- [ ] 启用调试模式进行问题诊断：`enableDevMode()`
+- [ ] 使用 `try-catch` 处理注入失败的情况
+
+**性能优化：**
+- [ ] 合理使用服务作用域，避免不必要的实例创建
+- [ ] 实现 `OnDestroy` 接口清理资源
+- [ ] 启用性能跟踪监控注入器表现
+
+### 🔧 调试技巧
+
+**快速诊断依赖注入问题：**
+
+```typescript
+import { enableDevMode, getDebugger, getInspector } from '@sker/di';
+
+// 1. 启用详细调试
+enableDevMode({
+  logToConsole: true,
+  collectMetrics: true,
+  includeStackTrace: true
+});
+
+// 2. 检查注入器层次结构
+const inspector = getInspector();
+inspector.printHierarchy();
+
+// 3. 验证服务注册
+const tokens = inspector.searchTokens('ServiceName');
+console.log('找到的服务:', tokens);
+
+// 4. 健康检查
+const health = inspector.validateHealth();
+console.log('健康检查结果:', health);
+```
+
+**常用调试命令：**
+```bash
+# 运行时调试
+injector.getDebugSnapshot()          # 获取注入器快照
+injector.getInjectorId()             # 获取注入器 ID
+injector.parent                      # 检查父注入器
+
+# 性能监控
+getDebugger().getDebugInfo()          # 获取调试信息和性能指标
+getDebugger().getDebugInfo().metrics  # 获取性能指标
+```
+
 ---
 
-🎉 **恭喜！** 您已经掌握了 SKER-DI 的核心功能和最佳实践。这个强大的依赖注入框架将帮助您构建更加模块化、可维护的 TypeScript 应用程序！
+🎉 **恭喜！** 您已经掌握了 SKER-DI 的核心功能和最佳实践。通过遵循这些经验教训，您能够避免常见的依赖注入陷阱，构建更加稳定可靠的 TypeScript 应用程序！

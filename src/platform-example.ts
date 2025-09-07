@@ -7,7 +7,8 @@
 import 'reflect-metadata';
 import { Injectable } from './injectable';
 import { InjectionToken } from './injection-token';
-import { createPlatformInjector, createApplicationInjector } from './index';
+import { Inject } from './inject';
+import { createPlatformInjector, createApplicationInjector, createInjector, createRootInjector } from './index';
 
 // ==================== 平台级服务 ====================
 
@@ -104,12 +105,14 @@ export class PlatformCacheService {
 /**
  * 应用级用户服务 - 每个应用独立
  */
-@Injectable({ providedIn: 'root' })
+@Injectable({ providedIn: 'auto' })
 export class UserService {
   constructor(
-    private logger: PlatformLoggerService,
-    private config: PlatformConfigService
-  ) {}
+    @Inject(PlatformLoggerService) private logger: PlatformLoggerService,
+    @Inject(PlatformConfigService) private config: PlatformConfigService
+  ) {
+    console.log('UserService 构造函数:', { logger: !!logger, config: !!config });
+  }
 
   async getUser(id: string) {
     this.logger.log('info', `获取用户信息: ${id}`);
@@ -127,11 +130,11 @@ export class UserService {
 /**
  * 应用级数据服务 - 使用平台缓存
  */
-@Injectable({ providedIn: 'root' })
+@Injectable({ providedIn: 'application' })
 export class DataService {
   constructor(
-    private cache: PlatformCacheService,
-    private logger: PlatformLoggerService
+    @Inject(PlatformCacheService) private cache: PlatformCacheService,
+    @Inject(PlatformLoggerService) private logger: PlatformLoggerService
   ) {}
 
   async getData(key: string): Promise<any> {
@@ -157,34 +160,35 @@ export class DataService {
 
 export function demonstratePlatformInjector() {
   console.log('=== Platform 注入器演示 ===\n');
-
-  // 1. 创建完整的注入器层次结构
+  
+  // 1. 正确的创建顺序：先创建根注入器
+  const rootInjector = createRootInjector();
+  
+  // 2. 创建平台注入器（自动使用根注入器作为父级）
   const platformInjector = createPlatformInjector([
     { provide: 'PLATFORM_NAME', useValue: 'MyPlatform' }
   ]);
 
+  // 3. 创建应用注入器（自动使用平台注入器作为父级）
   const app1Injector = createApplicationInjector([
     { provide: 'APP_NAME', useValue: 'Application 1' }
-  ], platformInjector);
+  ]);
 
   const app2Injector = createApplicationInjector([
     { provide: 'APP_NAME', useValue: 'Application 2' }
-  ], platformInjector);
-
-  // 创建根注入器来处理通用服务
-  const rootInjector1 = createInjector([], app1Injector);
-  const rootInjector2 = createInjector([], app2Injector);
+  ]);
 
   console.log('1. 注入器层次结构创建完成');
+  console.log(`   Root: ${rootInjector.scope}`);
   console.log(`   Platform: ${platformInjector.scope}`);
   console.log(`   App1: ${app1Injector.scope}`);
   console.log(`   App2: ${app2Injector.scope}`);
-  console.log(`   Root1: ${rootInjector1.scope}`);
-  console.log(`   Root2: ${rootInjector2.scope}`);
 
-  console.log('\n2. 应用注入器创建完成');
-  console.log(`   App1 作用域: ${app1Injector.scope}`);
-  console.log(`   App2 作用域: ${app2Injector.scope}`);
+  console.log('\n2. 验证注入器层次结构');
+  console.log(`   Root 注入器 ID: ${rootInjector.getInjectorId()}`);
+  console.log(`   Platform 父注入器: ${platformInjector.parent === rootInjector ? '✅ Root' : '❌ 错误'}`);
+  console.log(`   App1 父注入器: ${app1Injector.parent === platformInjector ? '✅ Platform' : '❌ 错误'}`);
+  console.log(`   App2 父注入器: ${app2Injector.parent === platformInjector ? '✅ Platform' : '❌ 错误'}`);
 
   // 3. 验证平台服务的单例性
   const logger1 = app1Injector.get(PlatformLoggerService);
@@ -215,23 +219,47 @@ export function demonstratePlatformInjector() {
   console.log(`   缓存大小: ${cache1.size()}`);
 
   // 6. 应用级服务使用平台服务
-  const userService1 = app1Injector.get(UserService);
-  const dataService2 = app2Injector.get(DataService);
+  console.log('\n6. 测试服务获取和调用...');
+  
+  let userService1: UserService | null = null;
+  let dataService2: DataService | null = null;
+  
+  try {
+    userService1 = app1Injector.get(UserService);
+    console.log('   ✅ UserService 获取成功');
+  } catch (error) {
+    console.error('   ❌ UserService 获取失败:', (error as Error).message);
+  }
+  
+  try {
+    dataService2 = app2Injector.get(DataService);
+    console.log('   ✅ DataService 获取成功');
+  } catch (error) {
+    console.error('   ❌ DataService 获取失败:', (error as Error).message);
+  }
 
-  console.log('\n6. 应用服务使用平台服务');
+  console.log('\n7. 应用服务调用测试');
   
   // 这些调用会使用共享的平台日志服务
-  userService1.getUser('123').then(user => {
-    console.log(`   App1 用户服务: ${JSON.stringify(user)}`);
-  });
+  if (userService1) {
+    userService1.getUser('123').then(user => {
+      console.log(`   App1 用户服务: ${JSON.stringify(user)}`);
+    }).catch(error => {
+      console.error('   ❌ UserService 调用失败:', error.message);
+    });
+  }
 
-  dataService2.getData('test-key').then(data => {
-    console.log(`   App2 数据服务: ${JSON.stringify(data)}`);
-  });
+  if (dataService2) {
+    dataService2.getData('test-key').then(data => {
+      console.log(`   App2 数据服务: ${JSON.stringify(data)}`);
+    }).catch(error => {
+      console.error('   ❌ DataService 调用失败:', error.message);
+    });
+  }
 
-  // 7. 最终统计
+  // 8. 最终统计
   setTimeout(() => {
-    console.log('\n7. 最终统计');
+    console.log('\n8. 最终统计');
     console.log(`   平台日志总数: ${logger1.getLogCount()}`);
     console.log(`   平台缓存大小: ${cache1.size()}`);
     console.log('\n=== 演示完成 ===');
