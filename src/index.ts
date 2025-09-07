@@ -23,8 +23,6 @@ export {
   FactoryProvider,
   ExistingProvider,
   ConstructorProvider,
-  LazyClassProvider,
-  LazyFactoryProvider
 } from './provider';
 export {
   Injectable,

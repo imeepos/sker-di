@@ -10,7 +10,6 @@ import {
   hasFlag
 } from './internal-inject-flags';
 import { isOnDestroy, OnDestroy } from './lifecycle';
-import { LazyManager } from './lazy-manager';
 import { resolveForwardRefCached, resolveForwardRefsInDeps, isForwardRef } from './forward-ref';
 import {
   getDebugger,
@@ -31,7 +30,6 @@ export class EnvironmentInjector extends Injector {
   private readonly autoResolvedClasses = new Set<any>();
   private readonly resolvingTokens = new Set<any>();
   private readonly dependencyPath: any[] = [];
-  private readonly lazyManager = new LazyManager();
   private isDestroyed = false;
   private readonly injectorId: string;
   private readonly debugger = getDebugger();
@@ -225,10 +223,6 @@ export class EnvironmentInjector extends Injector {
       throw new Error('注入器已销毁');
     }
 
-    // 检查是否为延迟提供者
-    if (this.lazyManager.isLazyProvider(resolvedToken)) {
-      return this.lazyManager.getLazyInstance(resolvedToken);
-    }
 
     // 检查缓存
     if (this.instances.has(resolvedToken)) {
@@ -340,28 +334,10 @@ export class EnvironmentInjector extends Injector {
         provider: provider,
         metadata: {
           isMulti: provider.multi || false,
-          isLazy: 'useLazyClass' in provider || 'useLazyFactory' in provider
+          isLazy: false
         }
       });
 
-      // 处理延迟提供者
-      if ('useLazyClass' in provider) {
-        this.lazyManager.registerLazyClass(
-          provider.provide,
-          provider,
-          (ctor) => this.createInstanceWithDI(ctor)
-        );
-        return;
-      }
-
-      if ('useLazyFactory' in provider) {
-        this.lazyManager.registerLazyFactory(
-          provider.provide,
-          provider,
-          (token, deps) => this.resolveDepsWithCycleDetection(token, deps)
-        );
-        return;
-      }
 
       // 处理普通提供者
       const existing = this.providers.get(provider.provide) || [];
@@ -664,15 +640,8 @@ export class EnvironmentInjector extends Injector {
       this.destroyInstance(instance);
     }
 
-    // 销毁所有已初始化的延迟实例
-    const lazyInstances = this.lazyManager.getInitializedInstances();
-    for (const instance of lazyInstances) {
-      this.destroyInstance(instance);
-    }
-
     // 清理所有数据结构
     this.instances.clear();
-    this.lazyManager.clear();
     this.resolvingTokens.clear();
     this.dependencyPath.length = 0;
 
@@ -814,18 +783,6 @@ export class EnvironmentInjector extends Injector {
       (token) => this.getTokenName(token)
     );
 
-    // 添加延迟实例信息
-    const lazyInstances = this.lazyManager.getInitializedInstances();
-    for (const instance of lazyInstances) {
-      instanceInfos.push({
-        token: 'lazy_instance',
-        tokenName: instance?.constructor?.name || 'unknown',
-        instanceType: instance?.constructor?.name || 'unknown',
-        createdAt: Date.now(),
-        isLazy: true,
-        hasOnDestroy: isOnDestroy(instance)
-      });
-    }
 
     return instanceInfos;
   }
