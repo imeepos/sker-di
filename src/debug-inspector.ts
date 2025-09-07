@@ -1,12 +1,8 @@
 import {
   DIDebugger,
-  IDIDebugger,
-  getDebugger,
-  DebugLevel,
   InjectorDebugInfo,
   ProviderDebugInfo,
   InstanceDebugInfo,
-  DebugMetrics
 } from './debug';
 import { Injectable } from './injectable';
 import { Inject } from './inject';
@@ -35,7 +31,6 @@ export const DI_INSPECTOR = new InjectionToken<IDIInspector>('DI_INSPECTOR');
  * 依赖注入调试检查器
  * 提供注入器状态检查和可视化工具
  */
-@Injectable({ providedIn: 'root' })
 export class DIInspector implements IDIInspector {
   constructor(@Inject(DIDebugger) private diDebugger: DIDebugger) {}
 
@@ -380,53 +375,5 @@ export class DIInspector implements IDIInspector {
     return this.diDebugger.exportDebugData();
   }
 }
-
-// 全局检查器实例（用于向后兼容）
-let globalInspectorInstance: DIInspector | null = null;
-
-/**
- * 获取调试检查器实例（向后兼容函数）
- * @deprecated 推荐使用DI注入方式获取检查器
- */
-export function getInspector(): DIInspector {
-  if (!globalInspectorInstance) {
-    const diDebugger = getDebugger();
-    globalInspectorInstance = new DIInspector(diDebugger);
-  }
-  return globalInspectorInstance;
-}
-
-/**
- * 便捷函数：打印注入器层次结构
- */
-export function printHierarchy(): string {
-  return getInspector().printInjectorHierarchy();
-}
-
-/**
- * 便捷函数：打印性能统计
- */
-export function printStats(): string {
-  return getInspector().printPerformanceStats();
-}
-
-/**
- * 便捷函数：搜索令牌
- */
-export function searchTokens(term: string): string {
-  return getInspector().searchTokens(term);
-}
-
-/**
- * 便捷函数：健康检查
- */
-export function healthCheck(): string {
-  return getInspector().validateHealth();
-}
-
-/**
- * 便捷函数：生成完整报告
- */
-export function generateReport(): string {
-  return getInspector().generateReport();
-}
+export const diDebugger = new DIDebugger()
+export const diInspector = new DIInspector(diDebugger)

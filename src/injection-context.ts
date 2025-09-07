@@ -46,12 +46,12 @@ const contextStack = new InjectionContextStack();
  * @returns 函数的返回值
  */
 export function runInInjectionContext<T>(
-  injector: Injector, 
+  injector: Injector,
   fn: () => T
 ): T {
   // 推入新的上下文
   contextStack.pushContext(injector);
-  
+
   try {
     // 执行函数
     return fn();
@@ -81,10 +81,10 @@ export function assertInInjectionContext(
   errorMessage: string = 'inject() 必须在注入上下文中调用'
 ): Injector {
   const currentInjector = getCurrentInjectionContext();
-  
+
   if (currentInjector === null) {
     throw new Error(errorMessage);
   }
-  
+
   return currentInjector;
 }

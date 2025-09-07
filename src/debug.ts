@@ -1,7 +1,4 @@
-import { InjectionTokenType } from './injector';
 import { Injectable } from './injectable';
-import { InjectionToken } from './injection-token';
-
 /**
  * 调试级别
  */
@@ -110,34 +107,10 @@ export interface DebugMetrics {
   autoResolvedProviders: number;
   cacheHitRate: number;
 }
-
-/**
- * DI调试器接口
- */
-export interface IDIDebugger {
-  enableDevMode(config?: Partial<DebugConfig>): void;
-  disable(): void;
-  updateConfig(config: Partial<DebugConfig>): void;
-  logEvent(event: Omit<DebugEvent, 'timestamp'>): void;
-  getEventHistory(): DebugEvent[];
-  getMetrics(): DebugMetrics;
-  getInjectorInfo(injectorId: string): InjectorDebugInfo | undefined;
-  getAllInjectorsInfo(): InjectorDebugInfo[];
-  clearHistory(): void;
-  printHierarchy(injector: any): void;
-  logProviders(injector: any): void;
-}
-
-/**
- * DI调试器注入令牌
- */
-export const DI_DEBUGGER = new InjectionToken<IDIDebugger>('DI_DEBUGGER');
-
 /**
  * 依赖注入调试器
  */
-@Injectable({ providedIn: 'root' })
-export class DIDebugger implements IDIDebugger {
+export class DIDebugger {
   private config: DebugConfig;
   private eventHistory: DebugEvent[] = [];
   private metrics: DebugMetrics;
@@ -217,7 +190,7 @@ export class DIDebugger implements IDIDebugger {
 
     // 添加到历史记录
     this.eventHistory.push(debugEvent);
-    
+
     // 限制历史记录大小
     if (this.eventHistory.length > this.config.maxEventHistory) {
       this.eventHistory.shift();
@@ -374,7 +347,7 @@ export class DIDebugger implements IDIDebugger {
    */
   getDependencyGraph(): Record<string, string[]> {
     const graph: Record<string, string[]> = {};
-    
+
     for (const event of this.eventHistory) {
       if (event.type === DebugEventType.DependencyResolved && event.dependencyPath) {
         const path = event.dependencyPath;
@@ -458,7 +431,7 @@ export class DIDebugger implements IDIDebugger {
       }
       return value;
     };
-    
+
     return JSON.stringify(data, replacer, 2);
   }
 
@@ -514,7 +487,7 @@ export class DIDebugger implements IDIDebugger {
 
     const timestamp = new Date(event.timestamp).toLocaleTimeString();
     const prefix = `[DI Debug ${timestamp}]`;
-    
+
     switch (level) {
       case DebugLevel.Error:
         console.error(prefix, this.formatEvent(event));
@@ -595,32 +568,4 @@ export class DIDebugger implements IDIDebugger {
     }
     return String(token);
   }
-}
-
-// 全局调试器实例（用于向后兼容）
-let globalDebuggerInstance: DIDebugger | null = null;
-
-/**
- * 获取调试器实例（向后兼容函数）
- * @deprecated 推荐使用DI注入方式获取调试器
- */
-export function getDebugger(): DIDebugger {
-  if (!globalDebuggerInstance) {
-    globalDebuggerInstance = new DIDebugger();
-  }
-  return globalDebuggerInstance;
-}
-
-/**
- * 启用开发模式调试（便捷函数）
- */
-export function enableDevMode(config?: Partial<DebugConfig>): void {
-  getDebugger().enableDevMode(config);
-}
-
-/**
- * 禁用调试（便捷函数）
- */
-export function disableDebug(): void {
-  getDebugger().disable();
 }

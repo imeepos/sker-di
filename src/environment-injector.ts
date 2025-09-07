@@ -12,13 +12,13 @@ import {
 import { isOnDestroy } from './lifecycle';
 import { resolveForwardRefCached, resolveForwardRefsInDeps } from './forward-ref';
 import {
-  getDebugger,
   DebugEventType,
   InjectorDebugInfo,
   ProviderDebugInfo,
   InstanceDebugInfo
 } from './debug';
 import { EnvironmentInjectorUtils } from './environment-injector-utils';
+import { diDebugger } from './debug-inspector';
 
 // 类型别名：不包含直接Type<T>的Provider联合类型
 type NormalizedProvider = ValueProvider<any> | ClassProvider<any> | FactoryProvider<any> | ExistingProvider<any> | ConstructorProvider<any>;
@@ -35,7 +35,7 @@ export class EnvironmentInjector extends Injector {
   private readonly dependencyPath: any[] = [];
   private isDestroyed = false;
   private readonly injectorId: string;
-  private readonly debugger = getDebugger();
+  private readonly debugger = diDebugger;
 
   /**
    * 注入器作用域，决定如何处理 providedIn 服务
@@ -64,14 +64,6 @@ export class EnvironmentInjector extends Injector {
   static createWithAutoProviders(manualProviders: Provider[], parent?: Injector, scope: InjectorScope = 'auto'): EnvironmentInjector {
     return new EnvironmentInjector(manualProviders, parent, scope);
   }
-
-  // 移除静态单例模式，改为通过 InjectorRegistry 服务管理
-
-  // 移除静态根注入器创建方法，请使用 InjectorRegistry 服务
-
-  // 移除静态根注入器获取方法，请使用 InjectorRegistry 服务
-
-  // 移除所有静态注入器管理方法，请使用 InjectorRegistry 服务
 
   /**
    * 获取指定令牌的依赖实例
@@ -204,7 +196,7 @@ export class EnvironmentInjector extends Injector {
     providers.forEach(provider => {
       let normalizedProvider: NormalizedProvider;
       let token: any;
-      
+
       // 自动转换 Type<T> 为 ConstructorProvider<T>
       if (EnvironmentInjectorUtils.isDirectType(provider)) {
         normalizedProvider = EnvironmentInjectorUtils.convertTypeToConstructorProvider(provider);

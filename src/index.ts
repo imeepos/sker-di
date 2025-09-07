@@ -58,8 +58,6 @@ export { forwardRef, ForwardRef, isForwardRef, resolveForwardRef } from './forwa
 // 调试和开发工具
 export {
   DIDebugger,
-  IDIDebugger,
-  DI_DEBUGGER,
   getDebugger,
   enableDevMode,
   disableDebug,
@@ -90,20 +88,6 @@ export {
 // ============================================================================
 // 🚀 DI 核心服务管理（一切皆服务，一切皆可注入）
 // ============================================================================
-
-// 注入器注册表服务（取代静态单例模式）
-export {
-  IInjectorRegistry,
-  INJECTOR_REGISTRY,
-  InjectorRegistry
-} from './injector-registry';
-
-// 平台管理服务（取代GlobalPlatform单例模式）
-export {
-  IPlatformManager,
-  PLATFORM_MANAGER,
-  PlatformManager
-} from './platform-manager';
 
 /**
  * 空注入器常量
@@ -148,13 +132,6 @@ export function createInjector(providers: Provider[], parent: Injector = NULL_IN
 // 🚀 平台架构系统 (扩展性增强)
 // ============================================================================
 
-// 平台引用
-export {
-  PlatformRef,
-  PlatformConfig,
-  PlatformModule,
-  PlatformExtension
-} from './platform-ref';
 
 // 应用管理系统
 export {
@@ -162,7 +139,6 @@ export {
   ApplicationState,
   ApplicationFeature,
   ApplicationManager,
-  DefaultApplicationRef
 } from './application-manager';
 
 // Feature引用系统
@@ -197,28 +173,10 @@ export {
   Module,
   ModuleMetadata,
   ModuleWithProviders,
-  ModuleClass,
   ModuleOptions,
   ResolvedModule,
   ModuleResolver,
-  ModuleUtils,
-  BaseModule,
   getModuleMetadata,
   isModule,
-  moduleResolver,
   MODULE_METADATA_KEY,
-  CORE_MODULE,
-  PLATFORM_MODULE,
-  APPLICATION_MODULE
 } from './module-system';
-
-// 平台扩展
-export {
-  registerExtension,
-  getExtension,
-  getAvailableExtensions,
-  createExtensionManager,
-  ExampleExtensions,
-  ExampleExtension,
-  ExtensionConfig
-} from './platform-extensions';

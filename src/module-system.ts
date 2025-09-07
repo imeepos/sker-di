@@ -1,6 +1,5 @@
-import { Provider } from './provider';
+import { Provider, Type } from './provider';
 import { InjectionToken } from './injection-token';
-import { PlatformExtension } from './platform-ref';
 import { Injectable } from './injectable';
 
 /**
@@ -11,7 +10,7 @@ export interface ModuleMetadata {
   providers?: Provider[];
 
   /** 导入的其他模块 */
-  imports?: (ModuleClass | ModuleWithProviders)[];
+  imports?: (Type<any> | ModuleWithProviders)[];
 
   /** 导出的服务（可供其他模块使用） */
   exports?: any[];
@@ -27,15 +26,8 @@ export interface ModuleMetadata {
  * 带有提供者的模块配置
  */
 export interface ModuleWithProviders<T = any> {
-  ngModule: ModuleClass<T>;
+  ngModule: Type<T>;
   providers: Provider[];
-}
-
-/**
- * 模块类型
- */
-export interface ModuleClass<T = any> {
-  new(...args: any[]): T;
 }
 
 /**
@@ -111,7 +103,7 @@ export function isModule(target: any): boolean {
  */
 @Injectable({ providedIn: 'root' })
 export class ModuleResolver {
-  private readonly resolvedModules = new Map<any, ResolvedModule>();
+  private readonly resolvedModules = new Map<any, ResolvedModule<any>>();
   private readonly resolvingModules = new Set<any>();
 
   /**
@@ -120,7 +112,7 @@ export class ModuleResolver {
    * @param moduleOrConfig 模块类或配置
    * @returns 解析后的模块信息
    */
-  resolve(moduleOrConfig: ModuleClass | ModuleWithProviders): ResolvedModule {
+  resolve<T>(moduleOrConfig: Type<T> | ModuleWithProviders<T>): ResolvedModule<T> {
     const moduleClass = this.extractModuleClass(moduleOrConfig);
 
     // 检查是否已解析
@@ -148,7 +140,7 @@ export class ModuleResolver {
   /**
    * 提取模块类
    */
-  private extractModuleClass(moduleOrConfig: ModuleClass | ModuleWithProviders): ModuleClass {
+  private extractModuleClass<T>(moduleOrConfig: Type<T> | ModuleWithProviders): Type<T> {
     if ('ngModule' in moduleOrConfig) {
       return moduleOrConfig.ngModule;
     }
@@ -158,7 +150,7 @@ export class ModuleResolver {
   /**
    * 执行模块解析
    */
-  private doResolve(moduleOrConfig: ModuleClass | ModuleWithProviders): ResolvedModule {
+  private doResolve<T>(moduleOrConfig: Type<T> | ModuleWithProviders): ResolvedModule<T> {
     const moduleClass = this.extractModuleClass(moduleOrConfig);
     const metadata = getModuleMetadata(moduleClass) || {};
 
@@ -171,7 +163,7 @@ export class ModuleResolver {
     }
 
     // 解析导入的模块
-    const importedModules: ResolvedModule[] = [];
+    const importedModules: ResolvedModule<any>[] = [];
     const importedProviders: Provider[] = [];
 
     if (metadata.imports) {
@@ -210,9 +202,9 @@ export class ModuleResolver {
 /**
  * 解析后的模块信息
  */
-export interface ResolvedModule {
+export interface ResolvedModule<T> {
   /** 模块类 */
-  moduleClass: ModuleClass;
+  moduleClass: Type<T>;
 
   /** 原始元数据 */
   metadata: ModuleOptions;
@@ -221,124 +213,11 @@ export interface ResolvedModule {
   providers: Provider[];
 
   /** 导入的模块 */
-  imports: ResolvedModule[];
+  imports: ResolvedModule<T>[];
 
   /** 导出的服务 */
   exports: any[];
 
   /** 是否已解析 */
   isResolved: boolean;
-}
-
-/**
- * 全局模块解析器实例
- */
-export const moduleResolver = new ModuleResolver();
-
-/**
- * 核心模块令牌
- */
-export const CORE_MODULE = new InjectionToken<any>('CORE_MODULE');
-export const PLATFORM_MODULE = new InjectionToken<any>('PLATFORM_MODULE');
-export const APPLICATION_MODULE = new InjectionToken<any>('APPLICATION_MODULE');
-
-/**
- * 模块工具函数
- */
-export class ModuleUtils {
-  /**
-   * 创建根模块
-   * 
-   * @param moduleClass 模块类
-   * @param providers 额外提供者
-   * @returns 带提供者的模块配置
-   */
-  static forRoot<T>(moduleClass: ModuleClass<T>, providers: Provider[] = []): ModuleWithProviders<T> {
-    return {
-      ngModule: moduleClass,
-      providers: [
-        ...providers,
-        { provide: moduleClass, useClass: moduleClass }
-      ]
-    };
-  }
-
-  /**
-   * 创建子模块
-   * 
-   * @param moduleClass 模块类
-   * @param providers 额外提供者
-   * @returns 带提供者的模块配置
-   */
-  static forChild<T>(moduleClass: ModuleClass<T>, providers: Provider[] = []): ModuleWithProviders<T> {
-    return {
-      ngModule: moduleClass,
-      providers
-    };
-  }
-
-  /**
-   * 创建功能模块
-   * 
-   * @param moduleClass 模块类
-   * @param config 功能配置
-   * @returns 带提供者的模块配置
-   */
-  static forFeature<T>(moduleClass: ModuleClass<T>, config: any = {}): ModuleWithProviders<T> {
-    return {
-      ngModule: moduleClass,
-      providers: [
-        { provide: 'FEATURE_CONFIG', useValue: config }
-      ]
-    };
-  }
-
-  /**
-   * 将模块转换为平台扩展
-   * 
-   * @param moduleOrConfig 模块配置
-   * @param name 扩展名称
-   * @returns 平台扩展
-   */
-  static toPlatformExtension(
-    moduleOrConfig: ModuleClass | ModuleWithProviders,
-    name?: string
-  ): PlatformExtension {
-    const resolved = moduleResolver.resolve(moduleOrConfig);
-    const moduleClass = resolved.moduleClass;
-
-    return {
-      name: name || moduleClass.name || 'unknown-module',
-      providers: resolved.providers,
-      initialize: async (platform) => {
-        // 模块初始化逻辑（如果需要）
-        console.log(`Initialized module extension: ${moduleClass.name}`);
-      }
-    };
-  }
-}
-
-/**
- * 通用模块基类
- * 提供一些通用的模块功能
- */
-export abstract class BaseModule {
-  constructor() {
-    // 模块实例化时的通用逻辑
-  }
-
-  /**
-   * 模块配置方法（可重写）
-   */
-  configure?(): void | Promise<void>;
-
-  /**
-   * 模块初始化方法（可重写）
-   */
-  initialize?(): void | Promise<void>;
-
-  /**
-   * 模块销毁方法（可重写）
-   */
-  destroy?(): void | Promise<void>;
 }
