@@ -13,7 +13,7 @@ import {
   InjectorRegistry,
   createInjector 
 } from './index';
-import { createPlatformFactory } from './platform-factory';
+import { createPlatformFactory, resetGlobalInjectorRegistry } from './platform-factory';
 
 describe('应用配置系统', () => {
   let registry: IInjectorRegistry;
@@ -119,7 +119,15 @@ describe('应用配置系统', () => {
 });
 
 describe('平台应用配置集成', () => {
-  // 这些测试使用平台工厂，无需清理
+  beforeEach(() => {
+    // 重置全局状态
+    resetGlobalInjectorRegistry();
+  });
+
+  afterEach(() => {
+    // 重置全局状态
+    resetGlobalInjectorRegistry();
+  });
 
   it('应该能够通过新配置系统引导应用', async () => {
     // 创建平台

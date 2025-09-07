@@ -359,13 +359,37 @@ export function createPlatformFactory(
   module: PlatformModule
 ): PlatformFactory {
   return function platformFactory(extraProviders: Provider[] = []): PlatformRef {
+    // 先确保全局注入器注册表存在
+    let injectorRegistry: IInjectorRegistry;
+    
+    if (!globalInjectorRegistry) {
+      const tempRoot = new EnvironmentInjector([
+        { provide: INJECTOR_REGISTRY, useClass: InjectorRegistry },
+        { provide: PLATFORM_MANAGER, useClass: PlatformManager }
+      ], undefined, 'root');
+      globalInjectorRegistry = tempRoot.get(INJECTOR_REGISTRY);
+    }
+    
+    // 检查全局注入器注册表的根注入器是否已销毁
+    const rootInjector = globalInjectorRegistry.getRootInjector();
+    if (rootInjector && (rootInjector as any).isDestroyed) {
+      // 如果根注入器已销毁，重新创建全局注入器注册表
+      const tempRoot = new EnvironmentInjector([
+        { provide: INJECTOR_REGISTRY, useClass: InjectorRegistry },
+        { provide: PLATFORM_MANAGER, useClass: PlatformManager }
+      ], undefined, 'root');
+      globalInjectorRegistry = tempRoot.get(INJECTOR_REGISTRY);
+    }
+    
+    injectorRegistry = globalInjectorRegistry;
+    
     // 合并提供者，包含核心DI管理服务
     let allProviders: Provider[] = [
       // 核心DI管理服务
       { provide: DI_DEBUGGER, useClass: DIDebugger },
       { provide: ApplicationManager, useClass: ApplicationManager },
       { provide: PLATFORM_MANAGER, useClass: PlatformManager },
-      { provide: INJECTOR_REGISTRY, useClass: InjectorRegistry },
+      { provide: INJECTOR_REGISTRY, useValue: injectorRegistry }, // 使用全局实例
       ...module.providers
     ];
     
@@ -389,7 +413,6 @@ export function createPlatformFactory(
     allProviders.push(...extraProviders);
 
     // 获取或创建注入器注册表实例
-    let injectorRegistry: IInjectorRegistry;
     let platformInjector: EnvironmentInjector;
     
     if (parentInjector) {
@@ -397,19 +420,11 @@ export function createPlatformFactory(
       platformInjector = new EnvironmentInjector(allProviders, parentInjector, 'platform');
       injectorRegistry = platformInjector.get(INJECTOR_REGISTRY);
     } else {
-      // 使用全局注入器注册表实例（确保跨平台工厂调用的一致性）
-      if (!globalInjectorRegistry) {
-        const tempRoot = new EnvironmentInjector([
-          { provide: INJECTOR_REGISTRY, useClass: InjectorRegistry },
-          { provide: PLATFORM_MANAGER, useClass: PlatformManager }
-        ], undefined, 'root');
-        globalInjectorRegistry = tempRoot.get(INJECTOR_REGISTRY);
-      }
-      injectorRegistry = globalInjectorRegistry;
+      // 使用预先初始化的全局注入器注册表
       
       // 检查是否已有平台注入器
       const existingPlatformInjector = injectorRegistry.getPlatformInjector();
-      if (existingPlatformInjector) {
+      if (existingPlatformInjector && !(existingPlatformInjector as any).isDestroyed) {
         platformInjector = existingPlatformInjector;
       } else {
         // 创建根注入器和平台注入器

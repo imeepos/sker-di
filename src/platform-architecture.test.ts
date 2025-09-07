@@ -1,5 +1,5 @@
 // 使用标准的 Jest 全局变量，不需要从 @jest/globals 导入
-import { createPlatformFactory } from './platform-factory';
+import { createPlatformFactory, resetGlobalInjectorRegistry } from './platform-factory';
 import { PlatformRef, PlatformModule } from './platform-ref';
 import { IPlatformManager, PLATFORM_MANAGER, PlatformManager } from './platform-manager';
 import { IInjectorRegistry, INJECTOR_REGISTRY, InjectorRegistry } from './injector-registry';
@@ -76,9 +76,17 @@ const TestRouterExtension: PlatformExtension = {
 };
 
 describe('Platform Architecture 扩展性测试', () => {
+  beforeEach(() => {
+    // 清理模块解析器和全局状态
+    moduleResolver.clear();
+    resetGlobalInjectorRegistry();
+  });
+
   afterEach(() => {
     // 清理模块解析器
     moduleResolver.clear();
+    // 重置全局状态
+    resetGlobalInjectorRegistry();
   });
 
   describe('🏗️ 基础平台工厂功能', () => {

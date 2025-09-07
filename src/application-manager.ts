@@ -97,6 +97,11 @@ export class ApplicationManager implements OnDestroy {
   private _platformInjector: EnvironmentInjector | null = null;
   
   private get platformInjector(): EnvironmentInjector {
+    // 检查缓存的平台注入器是否已销毁
+    if (this._platformInjector && (this._platformInjector as any).isDestroyed) {
+      this._platformInjector = null;
+    }
+    
     if (!this._platformInjector) {
       this._platformInjector = this.injectorRegistry.getPlatformInjector();
       if (!this._platformInjector) {

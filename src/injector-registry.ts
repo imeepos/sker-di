@@ -70,6 +70,11 @@ export class InjectorRegistry implements IInjectorRegistry {
   private platformInjector: EnvironmentInjector | null = null;
 
   getRootInjector(): EnvironmentInjector | null {
+    if (this.rootInjector && (this.rootInjector as any).isDestroyed) {
+      // 如果根注入器已销毁，自动清理引用
+      this.rootInjector = null;
+      this.platformInjector = null; // 同时清理平台注入器引用
+    }
     return this.rootInjector;
   }
 
@@ -93,11 +98,15 @@ export class InjectorRegistry implements IInjectorRegistry {
   }
 
   getPlatformInjector(): EnvironmentInjector | null {
+    if (this.platformInjector && (this.platformInjector as any).isDestroyed) {
+      // 如果平台注入器已销毁，自动清理引用
+      this.platformInjector = null;
+    }
     return this.platformInjector;
   }
 
   createPlatformInjector(providers: Provider[] = []): EnvironmentInjector {
-    if (this.platformInjector) {
+    if (this.platformInjector && !(this.platformInjector as any).isDestroyed) {
       throw new Error('Platform injector already exists. Call resetPlatformInjector() first to recreate it.');
     }
 
@@ -129,7 +138,7 @@ export class InjectorRegistry implements IInjectorRegistry {
   }
 
   createApplicationInjector(providers: Provider[] = []): EnvironmentInjector {
-    const platformInjector = this.platformInjector;
+    const platformInjector = this.getPlatformInjector();
     if (!platformInjector) {
       throw new Error('Platform injector must be created before application injector');
     }

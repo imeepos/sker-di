@@ -17,6 +17,9 @@ describe('新平台架构', () => {
   let platformManager: IPlatformManager;
 
   beforeEach(() => {
+    // 重置全局注入器注册表
+    resetGlobalInjectorRegistry();
+    
     // 创建临时根注入器用于测试
     tempRootInjector = new EnvironmentInjector([
       { provide: INJECTOR_REGISTRY, useClass: InjectorRegistry },
@@ -33,7 +36,11 @@ describe('新平台架构', () => {
     }
     // 清理测试环境
     if (tempRootInjector) {
-      tempRootInjector.destroy();
+      try {
+        tempRootInjector.destroy();
+      } catch (error) {
+        // 已销毁的注入器不需要再次销毁
+      }
     }
     // 重置全局注入器注册表
     resetGlobalInjectorRegistry();
