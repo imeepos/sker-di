@@ -96,7 +96,7 @@ export class EnvironmentInjector extends Injector {
    * @returns 根注入器实例，如果不存在则返回 null
    */
   static getRootInjector(): EnvironmentInjector | null {
-    return this.rootInjectorInstance || this.createRootInjector;
+    return this.rootInjectorInstance;
   }
 
   /**
