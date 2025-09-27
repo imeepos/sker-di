@@ -36,7 +36,7 @@ export class PlatformRef {
     const promisies: Promise<any>[] = [];
     this._applications.forEach(app => {
       if (isOnInit(app)) {
-        promisies.push(app.ngOnInit())
+        promisies.push(app.onInit())
       }
     })
     await Promise.all(promisies)
@@ -45,7 +45,7 @@ export class PlatformRef {
   async install<T>(id: string, type: Type<T>) {
     const ref = this.register(id, type)
     if (isOnInstall(ref)) {
-      await ref.ngOnInstall()
+      await ref.onInstall()
     }
     const storage = this.platformInjector.get(PlatformStorage)
     await storage.installApplication(ref.instance)
@@ -56,7 +56,7 @@ export class PlatformRef {
     const ref = this._applications.get(id)
     if (ref) {
       if (isOnUnInstall(ref)) {
-        await ref.ngOnUnInstall();
+        await ref.onUnInstall();
       }
       this._applications.delete(id)
     }
@@ -69,7 +69,7 @@ export class PlatformRef {
     if (ref) {
       const updateRef = this.register(id, type)
       if (isOnUpgrade(updateRef)) {
-        await updateRef.ngOnUpgrade();
+        await updateRef.onUpgrade();
       }
       const storage = this.platformInjector.get(PlatformStorage)
       await storage.upgradeApplication(id, updateRef.instance)

@@ -1,4 +1,3 @@
-import { Injectable } from './injectable';
 /**
  * 调试级别
  */

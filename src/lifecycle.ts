@@ -6,47 +6,46 @@ export interface OnDestroy {
   /**
    * 在实例销毁时调用的清理方法
    */
-  ngOnDestroy(): void;
+  onDestroy(): void;
 }
 
 export function isOnDestroy(obj: any): obj is OnDestroy {
   if (!obj) return false;
-  return typeof obj.ngOnDestroy === 'function';
+  return typeof obj.onDestroy === 'function';
 }
 
-
 export interface OnInit {
-  ngOnInit(): Promise<void>;
+  onInit(): Promise<void>;
 }
 
 export function isOnInit(obj: any): obj is OnInit {
   if (!obj) return false;
-  return typeof obj.ngOnInit === 'function';
+  return typeof obj.onInit === 'function';
 }
 
 export interface OnInstall {
-  ngOnInstall(): Promise<void>;
+  onInstall(): Promise<void>;
 }
 
 export function isOnInstall(obj: any): obj is OnInstall {
   if (!obj) return false;
-  return typeof obj.ngOnInstall === 'function';
+  return typeof obj.onInstall === 'function';
 }
 
 export interface OnUnInstall {
-  ngOnUnInstall(): Promise<void>;
+  onUnInstall(): Promise<void>;
 }
 
 export function isOnUnInstall(obj: any): obj is OnUnInstall {
   if (!obj) return false;
-  return typeof obj.ngOnUnInstall === 'function';
+  return typeof obj.onUnInstall === 'function';
 }
 
 export interface OnUpgrade {
-  ngOnUpgrade(): Promise<void>;
+  onUpgrade(): Promise<void>;
 }
 
 export function isOnUpgrade(obj: any): obj is OnUpgrade {
   if (!obj) return false;
-  return typeof obj.ngOnUpgrade === 'function';
+  return typeof obj.onUpgrade === 'function';
 }

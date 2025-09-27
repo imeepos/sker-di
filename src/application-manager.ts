@@ -38,7 +38,7 @@ export class ApplicationRef<T = any> implements OnInit {
     this.files.clear()
     this.injectors.clear();
   }
-  async ngOnInit(): Promise<void> {
+  async onInit(): Promise<void> {
     const inits = this._getInits()
     await Promise.all(inits.map(init => init()))
     await this.load()
